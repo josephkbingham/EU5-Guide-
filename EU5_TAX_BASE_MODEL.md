@@ -952,19 +952,22 @@ Player rule: a tax-base increase only becomes treasury income if the estate hold
 Estate Power is an estate's **share of the country's total Political Power** — its clout in government. The concept text is explicit: Political Power "is used to calculate `estate_power`," each pop "exerts a different amount of Political Power dependent on the estate they belong to," and "the total power of the estates reduces the `crown_power` of the country." So estate power is a *relative share*: raising one estate's power lowers everyone else's, and Crown Power is what remains after the estates take their slices.
 
 ```text
-estate_political_power_e ~=
-    sum over the estate's pops of (pop_size * power_per_pop_e)    [dominant term]
-  + (characters of estate e in the cabinet)  * BASE_ESTATE_POWER_FROM_CABINET
-  + (characters of estate e commanding units) * BASE_ESTATE_POWER_FROM_COMMAND
-  + local_<estate>_estate_power      (location scope)
-  + global_<estate>_estate_power     (country scope)
-  +/- culture and religion alignment, privileges, laws, reforms, advances
+estate_power_e =
+    ( SUM over locations [ SUM over pop types (pop_count * power_per_pop_e) ]
+      * (1 + local_modifier_e) )        # local_<estate>_estate_power, applied per location
+    * (1 + national_modifier_e)         # global_<estate>_estate_power, crown_power_from_population, ...
 
-estate_power_e (the displayed %) =
-    estate_political_power_e / total_political_power(all estates + Crown)
+# then shown as a share of the whole pie:
+estate_power_share_e =
+    estate_power_e / total_power(all estates + Crown)
 ```
 
-The per-pop weight `power_per_pop` is the dominant input, and it is **separate from the `tax_per_pop`** weight used for the tax-base split — an estate can be wealthy but politically weak, or vice versa. A single Nobles pop (`power_per_pop = 25`) exerts about 1,000× the political power of a single Peasants pop (`0.025`), so estate power tracks *weighted* population, not raw headcount. See the [per-pop weights table](#estate-shares-and-tax-income) for all estates.
+Two consequences follow from the `SUM over locations`:
+
+- Estate power is **national, but built from locations.** Each location contributes `population × power_per_pop`, scaled by that location's `local_<estate>_estate_power`. So local estate-power modifiers (Local Crown Power included) **roll up into the national total**, weighted by how populous the location is — see [Local Crown Power From Buildings](#local-crown-power-from-buildings).
+- It is a **zero-sum share.** The in-game Estates hint calls it "a zero-sum distribution" between the estates and the Crown: raising one estate's power lowers everyone else's, and Crown Power is simply the Crown's slice of the same pie.
+
+`power_per_pop` is the dominant input, and it is **separate from the `tax_per_pop`** weight used for the wealth/tax-base split — an estate can be wealthy but politically weak (Burghers: tax 40, power 4) or poor but influential (Cossacks: tax 0.02, power 0.5). A single Nobles pop (`power_per_pop = 25`) wields about 1,000× the political power of a single Peasants pop (`0.025`). Characters add power on top — `0.25` for each one an estate has in the cabinet or commanding an army or navy (the constants below). See the [per-pop weights table](#estate-shares-and-tax-income) for all estates.
 
 Installed constants (`loading_screen/common/defines/00_defines.txt`):
 
@@ -980,17 +983,37 @@ Estate power is an *input* to several systems, not just a status bar:
 
 | Consequence | Mechanism |
 |---|---|
-| Tax-base split | Each location's tax base is distributed among estates by their local power and pop weight — see [Estate Shares And Tax Income](#estate-shares-and-tax-income). |
+| Tax-base split | Each location's tax base is split among estates by **population weight** (`tax_per_pop`), *not* by estate power — see [Where the Money Goes](#where-the-money-goes). |
 | Trade-income split | Trade income is divided between Crown and estates by estate power; only the Crown Power share reaches the treasury. |
 | Max-tax effects | Above the 0.25 threshold an estate's `high_power` block applies (e.g., Nobles `nobles_estate_max_tax = -1.0`, scaled by how far over the threshold they sit); below it the `low_power` block raises max tax (e.g., `+0.5`). |
 | Crown penalties | Too much total estate power — usually from over-granting privileges — starves Crown Power, and very low Crown Power triggers country-wide penalties. |
 | Estate satisfaction & culture | Primary/accepted culture and matching state religion raise an estate's power and satisfaction; heretic/heathen religion or foreign culture lower both. |
 
-Evidence level: per-pop weights and the cabinet/command/threshold constants are `Exact` from `estates/00_default.txt` and `00_defines.txt`; the high/low-power scaling is `Exact` from the estate `high_power`/`low_power` block comments; normalizing into the displayed share and the final Crown-versus-estates aggregation are `Mixed`, because the engine performs the final political-power totalling.
+Evidence level: per-pop weights and the cabinet/command/threshold constants are `Exact` from `estates/00_default.txt` and `00_defines.txt`; the high/low-power scaling is `Exact` from the estate `high_power`/`low_power` block comments. The summation form matches the in-game Estates hint (estate power is "summed" from "the pops of each location") and is corroborated by the community wiki; normalizing into the displayed share and the final Crown-versus-estates totalling are `Mixed`, because the engine performs that step.
+
+#### Where the Money Goes
+
+A common misconception is that all of a location's money is handed out in proportion to estate power. It is not — **two different distributions run in parallel, and only one of them uses estate power.**
+
+**1. Tax base (a location's wealth) → split among estates by population, then taxed.** The in-game concept is explicit: a location's wealth "is distributed among the estates according to their **relative population**... Nobles get a much bigger share per capita than Burghers, which in turn get a much bigger share per capita than Peasants." That per-capita weight is `tax_per_pop`, *not* estate power. The Crown (`tax_per_pop = 0`) takes **none** of it — the estates hold the entire tax base. The treasury then collects income only by **taxing** each estate's share:
+
+```text
+estate_tax_income_e =
+    estate_wealth_share_e          # population * tax_per_pop, after peasant enfranchisement
+  * effective_tax_rate_e           # bounded by that estate's min / max tax
+  * (1 + tax_income_efficiency)
+  - estate_enrichment
+```
+
+As the Estates hint puts it: *"The Estates collect all the tax base from our locations, and we only get as much as we tax out of them."* Estate **power** still matters here, but indirectly — a high-power estate has a lower **max tax**, so you cannot tax its share as hard.
+
+**2. Trade and food profit/cost → split between Crown and estates by estate power.** This is the distribution that *is* proportional to estate power. The Crown's percentage — i.e. **Crown Power** — goes straight to the treasury; the rest is divided among the estates by their estate power. Per the crown-power hint: *"At 50% Crown Power, half of the expenses and profits for trade and food will go directly into the treasury, while the other half will be distributed among the estates, according to their respective estate power."*
+
+So, directly: **money from a location is not simply handed out in proportion to estate power.** Tax base is split by *population weight* and must be *taxed* out of the estates (with estate power setting the tax ceiling); only trade and food income is split *directly* by estate power, with the Crown's share reaching the treasury automatically. Note also that a location at `0%` control generates **no taxes at all**, even though the estates still hold and benefit from its wealth.
 
 #### Peasant Enfranchisement
 
-Peasant enfranchisement is a wealth-share redirect. The Peasants estate has `disenfranchise_to = nobles_estate`, and the UI tooltip says peasants receive only their average enfranchisement percentage of their wealth share; the rest goes to Nobles.
+Peasant enfranchisement is a redirect *within* the wealth-share distribution above: it sets how much of the **Peasants' own share** the Peasants keep, sending the rest to the Nobles. The Peasants estate has `disenfranchise_to = nobles_estate`, and the tooltip says peasants "only receive that percentage of their wealth share. The rest of their income is transferred to the Nobles." It depends mostly on the free-subjects societal value; towns and cities enfranchise more than rural locations, and some buildings shift it.
 
 ```text
 peasant_enfranchisement_final = Location.GetPeasantEnfranchisment
@@ -1018,27 +1041,32 @@ Installed examples:
 
 #### Local Crown Power From Buildings
 
-The building modifier is `local_crown_estate_power`, localized as Local Crown Power. It is a location-category estate-power modifier. The installed localization says it affects the estate power of the government, or Crown Power, in that location.
+The building modifier is `local_crown_estate_power`, localized as Local Crown Power. In the [estate-power formula](#estate-power) it is the location's `local_modifier` for the Crown — it scales how much that one location's population counts toward Crown Power.
 
 ```text
-local_crown_estate_power building
-  -> higher Crown estate power in that location
-  -> lower relative estate dominance there
-  -> better treasury result only through allocation, tax caps, or Crown/estate income splits
+local_crown_estate_power in a location
+  -> that location's population counts for more Crown power
+  -> because national Crown Power SUMS all locations, the national figure rises too
+  -> the gain is proportional to the location's population and pop value
 ```
 
-Use it as an extraction modifier, not a growth modifier. It does not raise `wealth`, prices, output, market access, or control on its own. In a rich but estate-dominated location, it can improve how much existing economy the state captures; in a poor location, there is little existing income to redirect.
+**Does it feed national Crown Power? Yes.** National Crown Power is the sum over locations of each location's Crown contribution, so a `local_crown_estate_power` building raises the national total — but only by as much as that location's population is worth. The crown-power hint and community sources agree: build it where there are **many high-value pops**, because a Nobles pop is worth ~1,000× a Peasants pop. A Local Crown Power building in a near-empty location barely moves the needle.
 
-Control also contributes to local Crown Power through the `inverse_control` static modifier:
+**How does it affect tax?** Not by giving the Crown a tax-base share — the Crown holds none ([Where the Money Goes](#where-the-money-goes)). It helps the treasury through three indirect channels:
+
+- **Trade and food split:** higher Crown Power sends a larger share of trade/food profit straight to the treasury instead of to the estates.
+- **Higher tax ceilings:** Crown Power and estate power are zero-sum, so more Crown Power means less estate power, which **raises the max tax** you can levy on the estates that actually hold the wealth.
+- **Governance:** easier laws, better cabinet efficiency, and more parliament base support.
+
+So treat it as an **extraction and centralization lever, not a growth lever** — it does not raise wealth, prices, output, market access, or control on its own.
+
+Control pushes the *other* way through the `inverse_control` static modifier, which applies `local_crown_estate_power = -1.0` scaled by `(1 - local_control)`:
 
 ```text
-inverse_control_factor = 1 - local_control
-
-local_crown_power_from_control =
-    -1.0 * inverse_control_factor
+local_crown_power_from_control = -1.0 * (1 - local_control)
 ```
 
-So a building with `local_crown_estate_power = 0.25` in a `60%` control location first has to offset about `-40%` Local Crown Power from low control. This is a separate local modifier from any Crown Power granted by the building itself.
+So a building granting `local_crown_estate_power = 0.25` in a `60%`-control location must first offset roughly `-40%` Local Crown Power from low control. This is also why **raising control in your most populous locations is itself one of the strongest national Crown Power levers** — the crown-power hint names "the control of our most populated locations" as a primary driver.
 
 Installed building examples:
 
@@ -1050,7 +1078,7 @@ Installed building examples:
 
 #### National Crown Power
 
-Country-scope Crown Power is built from country modifiers, population contribution, base Crown power, privileges, laws, reforms, advances, average control, and the pressure of non-Crown estates. The installed files expose these key modifiers:
+National Crown Power is the Crown's slice of the zero-sum estate-power pie — which, by the [estate-power formula](#estate-power), is the **sum over every location** of the Crown's population contribution, scaled by local and national modifiers. So it is built from population, the `local_crown_estate_power` in each location (including the `inverse_control` penalty for low control), the privileges granted to estates (which raise *their* power and so lower the Crown's), and the country-scope modifiers below:
 
 ```text
 global_crown_estate_power
@@ -1093,17 +1121,17 @@ normal_trade_profit
   -> treasury receives Crown Power percentage
 ```
 
-This is why a local Crown Power building and a national Crown Power law can both help the state but at different layers. The building fights the local allocation problem in one location. The national modifier changes the country's overall Crown/estate balance and therefore matters even when income comes from trade routes rather than local tax base.
+This is why a local Crown Power building and a national Crown Power law help at *different points of the same sum*. The building raises the Crown's contribution from one location (best where pops are many and valuable); the national modifier lifts every location's contribution at once. Both land in the same national Crown Power figure, which governs the trade/food treasury split and estate max-tax ceilings even when income comes from trade rather than local tax base.
 
 Current-build caveat: control now reaches Crown Power through two visible paths. Locally, low control applies an `inverse_control` penalty to Local Crown Power. Nationally, average control modifies the Crown's population-based power. The second path is not shown as a redistribution to a specific rival estate; it changes the Crown's population multiplier. For strategy, treat this as a compound penalty for low-control population rather than as a simple zero-sum estate transfer.
 
-For non-Crown estates with taxable pops, local power affects income by changing who controls the taxable base, not by creating source wealth by itself:
+For non-Crown estates, raising their power adds to *their* slice of the same zero-sum pie. It can tilt the local wealth share toward that estate, but its larger and more certain effects are on **taxability and the trade/food split**:
 
 ```text
 more local_<non_crown_estate>_estate_power
-  -> larger local estate share of tax base
-  -> more income only if that estate has a usable tax rate/cap
-  -> less useful if the estate is hard to tax or has high-power max-tax penalties
+  -> that estate holds more power locally, and (summed) nationally
+  -> its max tax falls (powerful estates resist taxation); its trade/food/parliament weight rises
+  -> usually a net negative for the treasury unless you can still extract from it
 ```
 
 Country-level estate power also matters because total estate power reduces Crown Power. Lower Crown Power reduces the treasury share of normal trade income, since installed concepts say only the Crown Power share of trade income reaches the treasury. Crown-specific local power is therefore best read as a local extraction and centralization lever, national Crown Power as a country-wide state-capacity lever, and non-Crown local estate power as a local taxable-share lever.
