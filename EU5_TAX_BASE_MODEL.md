@@ -219,18 +219,18 @@ For quick estimates, treat `estate_power_modifier_e` as `1` unless the location/
 
 `final_estate_share_e` means the estate share after special transfer rules. The visible peasant value is `Location.GetPeasantEnfranchisment`; the underlying modifier keys use the installed spelling `local_peasant_enfranchisment` and `global_peasant_enfranchisment`.
 
-Installed `tax_per_pop` weights:
+Installed per-pop weights (`estates/00_default.txt`). `tax_per_pop` weights the tax-base split; `power_per_pop` weights [estate power](#estate-power). The two are independent, so an estate can be rich but politically weak (Burghers) or poor but influential (Cossacks):
 
-| Estate | `tax_per_pop` | Strategic meaning |
-|---|---:|---|
-| Crown | 0 | Crown power affects trade-income split and tax caps, but crown pops do not take local tax-base share. |
-| Nobles | 100 | Dominant per-pop claim on wealth; noble-heavy locations shift tax base to nobles. |
-| Clergy | 25 | Meaningful tax-base share, below burghers and nobles. |
-| Burghers | 40 | Strong urban/commercial claim; often tied to trade and production modifiers. |
-| Peasants | 1 | Large numbers can matter, but each pop has low weight. |
-| Dhimmi | 1 | Same low per-pop tax-base weight as peasants in this build. |
-| Tribes | 0.01 | Very low per-pop taxable share. |
-| Cossacks | 0.02 | Very low per-pop taxable share. |
+| Estate | `tax_per_pop` | `power_per_pop` | Strategic meaning |
+|---|---:|---:|---|
+| Crown | 0 | 0 | Crown pops take neither tax-base share nor per-pop power; Crown Power comes from population, command, cabinet, and modifiers instead. |
+| Nobles | 100 | 25 | Dominant claim on both wealth and influence; noble-heavy locations shift tax base and political power to Nobles. |
+| Clergy | 25 | 10 | Meaningful tax and power weight, below Nobles. |
+| Burghers | 40 | 4 | Strong tax claim but modest per-pop power: commercial wealth without proportional political weight. |
+| Peasants | 1 | 0.025 | Huge numbers, tiny per-pop weight; one Nobles pop outweighs ~1,000 Peasants pops in power. |
+| Dhimmi | 1 | 0.02 | Low on both. |
+| Tribes | 0.01 | 0.01 | Very low on both. |
+| Cossacks | 0.02 | 0.5 | Low tax weight but relatively high per-pop power for a non-elite estate. |
 
 Peasant enfranchisement decides how much of the Peasants estate's wealth share peasants actually keep. The rest is transferred to Nobles:
 
@@ -947,6 +947,47 @@ Installed tax cap examples:
 
 Player rule: a tax-base increase only becomes treasury income if the estate holding that share can be taxed. Estate management is part of economic optimization, not a separate political minigame.
 
+#### Estate Power
+
+Estate Power is an estate's **share of the country's total Political Power** — its clout in government. The concept text is explicit: Political Power "is used to calculate `estate_power`," each pop "exerts a different amount of Political Power dependent on the estate they belong to," and "the total power of the estates reduces the `crown_power` of the country." So estate power is a *relative share*: raising one estate's power lowers everyone else's, and Crown Power is what remains after the estates take their slices.
+
+```text
+estate_political_power_e ~=
+    sum over the estate's pops of (pop_size * power_per_pop_e)    [dominant term]
+  + (characters of estate e in the cabinet)  * BASE_ESTATE_POWER_FROM_CABINET
+  + (characters of estate e commanding units) * BASE_ESTATE_POWER_FROM_COMMAND
+  + local_<estate>_estate_power      (location scope)
+  + global_<estate>_estate_power     (country scope)
+  +/- culture and religion alignment, privileges, laws, reforms, advances
+
+estate_power_e (the displayed %) =
+    estate_political_power_e / total_political_power(all estates + Crown)
+```
+
+The per-pop weight `power_per_pop` is the dominant input, and it is **separate from the `tax_per_pop`** weight used for the tax-base split — an estate can be wealthy but politically weak, or vice versa. A single Nobles pop (`power_per_pop = 25`) exerts about 1,000× the political power of a single Peasants pop (`0.025`), so estate power tracks *weighted* population, not raw headcount. See the [per-pop weights table](#estate-shares-and-tax-income) for all estates.
+
+Installed constants (`loading_screen/common/defines/00_defines.txt`):
+
+| Define | Value | Meaning |
+|---|---:|---|
+| `BASE_ESTATE_POWER_FROM_CABINET` | `0.25` | Power an estate gains per character it has appointed to the cabinet. |
+| `BASE_ESTATE_POWER_FROM_COMMAND` | `0.25` | Power an estate gains per character it has commanding an army or navy. |
+| `LOW_POWER_THRESHOLD` | `0.25` | The 25% pivot. An estate's `high_power` effects scale with `(power - 0.25)` when above it; its `low_power` effects scale with `(0.25 - power)` when below it. |
+
+The Crown is special: it has `power_per_pop = 0`, so it gains nothing from ordinary pops. Crown Power instead comes from `crown_power_from_population` (base `1.0`, modified by average control via `average_control_50`), `base_crown_estate_power_modifier`, `global_crown_estate_power`, cabinet/command characters, and privileges/laws/advances — see [National Crown Power](#national-crown-power).
+
+Estate power is an *input* to several systems, not just a status bar:
+
+| Consequence | Mechanism |
+|---|---|
+| Tax-base split | Each location's tax base is distributed among estates by their local power and pop weight — see [Estate Shares And Tax Income](#estate-shares-and-tax-income). |
+| Trade-income split | Trade income is divided between Crown and estates by estate power; only the Crown Power share reaches the treasury. |
+| Max-tax effects | Above the 0.25 threshold an estate's `high_power` block applies (e.g., Nobles `nobles_estate_max_tax = -1.0`, scaled by how far over the threshold they sit); below it the `low_power` block raises max tax (e.g., `+0.5`). |
+| Crown penalties | Too much total estate power — usually from over-granting privileges — starves Crown Power, and very low Crown Power triggers country-wide penalties. |
+| Estate satisfaction & culture | Primary/accepted culture and matching state religion raise an estate's power and satisfaction; heretic/heathen religion or foreign culture lower both. |
+
+Evidence level: per-pop weights and the cabinet/command/threshold constants are `Exact` from `estates/00_default.txt` and `00_defines.txt`; the high/low-power scaling is `Exact` from the estate `high_power`/`low_power` block comments; normalizing into the displayed share and the final Crown-versus-estates aggregation are `Mixed`, because the engine performs the final political-power totalling.
+
 #### Peasant Enfranchisement
 
 Peasant enfranchisement is a wealth-share redirect. The Peasants estate has `disenfranchise_to = nobles_estate`, and the UI tooltip says peasants receive only their average enfranchisement percentage of their wealth share; the rest goes to Nobles.
@@ -1243,7 +1284,10 @@ This is the minimum vocabulary for reading economic modifiers in files and toolt
 | `ESTABLISHMENT_SYSTEM_ENABLED` | Installed define controlling whether building establishment throughput/bonus is active. Current checked value is `no`. | `loading_screen/common/defines/00_defines.txt`. |
 | `local_building_establishment_speed`, `global_building_establishment_speed` | Establishment speed modifiers; only income-relevant if establishment is enabled. | modifier definitions, localization, laws, privileges, societal values. |
 | `tax_per_pop` | Estate weight for local wealth share. | `estates/00_default.txt`. |
-| `power_per_pop` | Estate political-power weight per pop. | `estates/00_default.txt`. |
+| `power_per_pop` | Estate political-power weight per pop (drives [estate power](#estate-power)); separate from `tax_per_pop`. | `estates/00_default.txt`. |
+| `estate_power` | An estate's share of total country Political Power; input to tax-base split, trade-income split, max-tax effects, and Crown Power. | estate UI, `estate_power(estate_type:X)` triggers, game concepts. |
+| `BASE_ESTATE_POWER_FROM_CABINET` / `BASE_ESTATE_POWER_FROM_COMMAND` | Estate power per character in the cabinet / commanding units; both `0.25` in this build. | `loading_screen/common/defines/00_defines.txt`. |
+| `LOW_POWER_THRESHOLD` | The 25% pivot that decides whether an estate's `high_power` or `low_power` effects apply and how strongly. | `loading_screen/common/defines/00_defines.txt`. |
 | `local_<estate>_estate_power` | Location modifier that shifts local estate power; for non-Crown estates this can shift local tax-base allocation. | buildings, town rights, local modifiers. |
 | `global_<estate>_estate_power` | Country modifier that shifts estate power more broadly. | laws, privileges, reforms, modifiers. |
 | `local_crown_estate_power` | Location modifier localized as Local Crown Power; affects Crown/government estate power in that location only. | council halls, town buildings, forts, estate buildings, town rights. |
