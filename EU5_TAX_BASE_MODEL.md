@@ -1,19 +1,58 @@
 # EU5 Guide
 
-This guide is meant to become a broad Europa Universalis V manual over time. The current pass focuses on the economy: wealth, tax base, control, markets, trade, estates, and the parameters a player can use to reason about economic strategy.
+A working strategy manual for Europa Universalis V, built by reading the installed game files rather than relying on memory or wikis. This edition covers the **economy** end to end: how wealth is created, how much of it becomes taxable, and how it finally reaches the treasury. Military, diplomacy, society, religion, and progression are scaffolded as [planned sections](#planned-sections) and will follow the same file-first method.
 
-Generated from the installed EU5 files at:
+**Generated from:**
 
-`/mnt/d/Program Files/Steam/steamapps/common/Europa Universalis V`
-
-Local build identifiers seen on 2026-06-06:
-
+- Install path: `/mnt/d/Program Files/Steam/steamapps/common/Europa Universalis V`
+- Captured: `2026-06-06`
 - `caesar_branch.txt`: `u26q2/release/next`
 - `caesar_rev.txt` / `binaries/checksum.txt`: `4be9dd2e34196e66a72855407a347f5235e3bd27c2c34fc63a0e2980cc2e8149eed42774`
 
-Source policy: installed game files are authoritative for this guide. Public sources are useful cross-checks, but they can lag behind the local build. Source links and reusable search paths live in the Codex skill `eu5-game-guide`.
+**Source policy:** installed game files are authoritative. Public sources are useful cross-checks, but can lag the local build. Reusable search paths live in the Codex skill `eu5-game-guide`. For a broader catalog of moddable parameters, see [EU5_GAMEPLAY_PARAMETERS.md](EU5_GAMEPLAY_PARAMETERS.md).
 
-## Economy: Quick Mental Model
+## How to Read This Guide
+
+Two label systems run through every table, so you can separate *how much a lever matters* from *how well the game documents it*.
+
+**Strategy weight** — how much the dependency typically moves the outcome. These are prioritization judgments, not claims that each branch has one stable global coefficient.
+
+| Weight | Meaning |
+|---|---|
+| `Critical` | Usually the first-order constraint or multiplier. Fix these first. |
+| `High` | Strongly affects outcomes in many starts. |
+| `Medium` | Often important, but depends on context or a specific branch. |
+| `Low` | Mostly secondary for tax base unless combined with other levers. |
+| `Conditional` | Can dominate in specific markets, geographies, or estate setups. |
+
+**Evidence level** — how directly the claim is backed by the files.
+
+| Evidence | Meaning |
+|---|---|
+| `Exact` | Directly exposed as a formula, coefficient, or file value. |
+| `Derived` | Algebraically inferred from exact pieces. |
+| `Mixed` | Partly file/UI backed, partly engine-side or state-dependent. |
+| `Inferred` | Useful strategy model, but not exposed as a direct formula. |
+
+**Reading the equations:** treat UI percentages as decimals (75% control = `0.75`). An `=` line is exact from the files; a `~=` line is a strategy-level approximation of engine-side math.
+
+**Navigation:** the [Table of Contents](#table-of-contents) lists every section. [Critical Dependencies](#critical-dependencies) is the fastest orientation; the [Dependency Graph](#dependency-graph) is the full map, and every subgraph links back to it.
+
+## Table of Contents
+
+**Economy** (current edition)
+
+1. [Quick Mental Model](#quick-mental-model) — the five-layer summary
+2. [Critical Dependencies](#critical-dependencies) — the levers that decide most outcomes
+3. [Core Equations](#core-equations) — wealth, tax base, estates, prices, trade
+4. [Dependency Graph](#dependency-graph) — the full map and every subgraph
+5. [Parameter Dictionary](#parameter-dictionary) — vocabulary for files and tooltips
+6. [Strategy Checklist](#strategy-checklist) — the order to evaluate an economic action
+7. [Common Strategic Patterns](#common-strategic-patterns) — recipes for typical situations
+
+**Planned Sections** (placeholders): [Military](#military) · [Diplomacy and Subjects](#diplomacy-and-subjects) · [Society and Government](#society-and-government) · [Religion and Culture](#religion-and-culture) · [Progression and Events](#progression-and-events)
+
+## Quick Mental Model
 
 EU5's economy is easiest to read in layers:
 
@@ -32,7 +71,51 @@ The strategic shortcut:
 - Normal player trade routes and autonomous Burgher trade share the same market ecology, but they do not use the same capacity/control surface.
 - Estate composition changes who receives the tax base and how hard the state can tax it.
 
-## Economy: Core Equations
+## Critical Dependencies
+
+If you read nothing else, read this. Treasury income is a chain, and it is only as strong as its weakest link: wealth you cannot control is not taxable, and tax base held by an estate you cannot tax is not income.
+
+**The critical path**
+
+```text
+location_wealth
+   │  × local_control          (control decides how much wealth is taxable)
+   ▼
+location_tax_base
+   │  × estate share           (which estate owns the taxable base)
+   ▼
+estate_tax_base
+   │  × tax rate × efficiency   (only if that estate can be taxed, under caps)
+   ▼
+treasury income
+```
+
+Every `Critical`-weighted lever in the guide sits on this path:
+
+| Lever | Stage | Why it is critical | Detail |
+|---|---|---|---|
+| `local_control` | Tax base | Direct multiplier on wealth. 100 wealth at 50% control = 50 tax base; at 80% = 80. Also feeds local and national Crown Power. | [Control](#control-subgraph) |
+| `location_wealth` | Tax base | The base amount before control. High control over poor land still yields little. | [Location Wealth](#location-wealth-subgraph) |
+| Building profit | Wealth | The most scalable wealth branch; drives towns, cities, and industry. | [Building Wealth](#building-wealth-subgraph) |
+| Output price/quantity vs. input/maintenance cost | Building profit | Expensive inputs erase output gains and can turn a building unprofitable (and idle). | [Building Wealth](#building-wealth-subgraph) |
+| Employment | Building profit | Buildings are efficient in proportion to employed pops; unstaffed buildings sit idle. | [Employees, POP Deficits, and Profit](#employees-pop-deficits-and-profit) |
+| Estate taxability (rate and caps) | Extraction | Tax base only becomes income if the estate holding it can actually be taxed. | [Estate Allocation](#estate-allocation-and-tax-extraction-subgraph) |
+
+**The shortlist** — when you can only do a few things:
+
+1. **Raise control where wealth is already high.** It is the cleanest multiplier and compounds into Crown Power. Rich-but-uncontrolled land is usually the highest-value fix.
+2. **Protect building profitability.** Keep input and maintenance goods cheap and available, and make sure the building can be staffed.
+3. **Check who owns the tax base before celebrating wealth.** An estate you cannot tax converts little of it to treasury.
+
+**The common traps:**
+
+- High-wealth, low-control locations are wasted potential — see [Rich But Uncontrolled Land](#rich-but-uncontrolled-land).
+- A high-output building with bad input prices or poor market access adds little taxable wealth.
+- Expanding into large but low-control populations can *lower* national Crown Power through the average-control path.
+
+Read this together with the [Strategy Checklist](#strategy-checklist), which walks the same chain in evaluation order.
+
+## Core Equations
 
 Use UI percentages as decimals in the equations. For example, 75% control is `0.75`.
 
@@ -278,24 +361,11 @@ Evidence level: mixed/inferred. Installed localization says Burghers attempt to 
 
 Other pops create demand and work in buildings/RGOs, but they do not have an equivalent autonomous `trades_per_<pop>` capacity in the installed files. In this build, the named autonomous pop-trade system is Burgher-specific.
 
-## Economy: Dependency Graph
+## Dependency Graph
 
-Weight labels are strategy weights, not a claim that every branch has one stable global coefficient.
+This is the full map of the economy. Weight and evidence labels are defined in [How to Read This Guide](#how-to-read-this-guide). Start at the top-level graph, then follow any branch into its subgraph; every subgraph links back here. Indentation shows what feeds what.
 
-- `Critical`: usually the first-order constraint or multiplier.
-- `High`: strongly affects outcomes in many starts.
-- `Medium`: often important, but depends more on context or specific branch.
-- `Low`: mostly secondary for tax base unless combined with other levers.
-- `Conditional`: can dominate in specific markets, geographies, or estate setups.
-
-Evidence labels:
-
-- `Exact`: directly exposed as a formula, coefficient, or file value.
-- `Derived`: algebraically inferred from exact pieces.
-- `Mixed`: partly file/UI backed, partly engine-side or state-dependent.
-- `Inferred`: useful strategy model, but not exposed as a direct formula.
-
-Top-level economy graph:
+**Top-level economy graph:**
 
 - [Country Aggregation](#country-aggregation-subgraph) `[Weight: High, Exact]`
 - [Location Tax Base](#location-tax-base-subgraph) `[Weight: Critical, Exact]`
@@ -312,7 +382,7 @@ Top-level economy graph:
 
 ### Country Aggregation Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 country_tax_base
@@ -333,7 +403,7 @@ Player rule: when comparing expansion targets, do not only ask "how much wealth 
 
 ### Location Tax Base Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 location_tax_base
@@ -356,7 +426,7 @@ Player rule: prioritize control where wealth is already high, and build wealth w
 
 ### Location Wealth Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 location_wealth
@@ -378,7 +448,7 @@ Player rule: local wealth is not the same as production volume. A high-output bu
 
 ### RGO Wealth Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 RGO_profit
@@ -433,7 +503,7 @@ Player rule: expand valuable RGOs when the location can access a market, employ 
 
 ### Building Wealth Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 building_profit
@@ -561,7 +631,7 @@ Player rule: build where the output is valuable, inputs are affordable, market a
 
 ### Burgher Trade Wealth Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 burgher_trade_wealth
@@ -640,7 +710,7 @@ Player rule: Burghers are powerful in commercial economies, but commercial power
 
 ### Goods Demand And Prices Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 market_price
@@ -691,7 +761,7 @@ Player rule: prices are not simply "good if high." High prices help producers of
 
 ### Market Access Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 market_access
@@ -729,7 +799,7 @@ Player rule: access infrastructure multiplies other economic plans. Build roads,
 
 ### Storage And Stockpiles Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 market stockpile
@@ -766,7 +836,7 @@ Player rule: storage is a shock absorber. It usually will not make a poor locati
 
 ### Control Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 local_control
@@ -827,7 +897,7 @@ For poor, sparsely populated locations, build wealth or strategic infrastructure
 
 ### Estate Allocation And Tax Extraction Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 treasury tax income
@@ -999,7 +1069,7 @@ Country-level estate power also matters because total estate power reduces Crown
 
 ### Trade And Naval Economy Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 trade and naval economy
@@ -1136,7 +1206,7 @@ Trade UI parameter map:
 
 Player rule: trade capacity is often good even where control is low because trade income does not scale down by local control the way tax base does. The indirect price effects still depend on the market and production network.
 
-## Economy: Parameter Dictionary
+## Parameter Dictionary
 
 This is the minimum vocabulary for reading economic modifiers in files and tooltips.
 
@@ -1206,7 +1276,7 @@ This is the minimum vocabulary for reading economic modifiers in files and toolt
 
 For broader parameter discovery, use `EU5_GAMEPLAY_PARAMETERS.md` as the project-level catalog.
 
-## Economy: Strategy Checklist
+## Strategy Checklist
 
 When choosing an economic action, walk the chain in order:
 
@@ -1221,7 +1291,7 @@ When choosing an economic action, walk the chain in order:
 9. Does storage protect the production chain from shortages?
 10. Does the action support future guide goals such as military logistics, control, diplomacy, or expansion?
 
-## Economy: Common Strategic Patterns
+## Common Strategic Patterns
 
 ### Rich But Uncontrolled Land
 
@@ -1278,9 +1348,9 @@ Best levers:
 
 Why: tax base is not treasury income until it passes through estate allocation and tax extraction.
 
-## Future Guide Sections
+## Planned Sections
 
-These sections are intentionally placeholders. Add them later using the same rule: inspect installed game files first, then cross-check public sources only as secondary context.
+These are intentional placeholders for future editions. Each will be built with the same rule the economy section followed: inspect installed game files first, then cross-check public sources only as secondary context.
 
 ### Military
 
