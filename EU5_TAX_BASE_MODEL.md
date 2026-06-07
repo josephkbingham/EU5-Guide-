@@ -1136,6 +1136,10 @@ Trade UI parameter map:
 
 Player rule: trade capacity is often good even where control is low because trade income does not scale down by local control the way tax base does. The indirect price effects still depend on the market and production network.
 
+#### Developer Commentary: Trade System Goals
+
+- [On Trade: Trade Routes, Prices, Production, and the Gameplay Goals of a Trade System](https://forum.paradoxplaza.com/forum/threads/on-trade-trade-routes-prices-production-and-the-gameplay-goals-of-a-trade-system.1922327/) — official Paradox forum developer diary explaining the design intent behind trade routes, market prices, production, and how the trade system is meant to fit the wider economy. Useful as a secondary cross-check on *why* the levers above (merchant capacity, trade range, trade income, market access) are shaped the way they are; per this guide's source policy, the installed game files remain authoritative for exact values.
+
 ## Economy: Parameter Dictionary
 
 This is the minimum vocabulary for reading economic modifiers in files and tooltips.
