@@ -1124,6 +1124,14 @@ Examples:
 | `50%` | `0%` |
 | `100%` | `+25%` |
 
+The in-game "Crown Power from Population" line opens its own sub-breakdown that confirms this composition:
+
+- **Base Value for Every Country `+100%`** — the `crown_power_from_population = 1.0` base every country starts with.
+- **Average Control in Country** — the `average_control_50` term, `0.5 × (avg_control − 0.50)`. (One save shows `+7.15%` here, implying ~`64.3%` average control; below 50% it goes negative — e.g. the `−26.89%`-net low-control example below.)
+- **Economic Base of Subjects** — a small adjustment from the economic base of subjects.
+
+Difficulty, age advances (e.g. `Statecraft`, `Sovereignty`), laws (e.g. `Zonta`), and the ruler's administrative ability then scale the Crown's population power further.
+
 National Crown Power is not a direct production stat either. Its income effect is mainly that it changes how much estate power pushes back against the state, what Crown-power-scaled effects apply, and how much normal trade income reaches the treasury:
 
 ```text
@@ -1153,7 +1161,7 @@ The payoff is the key part: unlike estates (which use `high_power`/`low_power` a
 | `remove_bureaucracy_price_cost_modifier = -0.25` | **−3.14%** |
 | `maintain_bureaucracy_price_cost_modifier = -0.05` | **−0.62%** |
 
-This is the exact mechanism behind the trade/food split: `trade_income = 1.0` means **treasury trade share = Crown Power** (here 12.58%; the hint's "50% Crown Power → half of trade" is the same line at a higher share). It is also why more Crown Power raises max tax (`global_estate_max_tax = 0.20 × Crown Power`), cheapens privilege revocation and policy changes, and lifts cabinet efficiency and parliament support — all scaling straight off the Crown's share.
+This is the exact mechanism behind the trade/food split: `trade_income = 1.0` means **treasury trade share = Crown Power** (here 12.58%; the hint's "50% Crown Power → half of trade" is the same line at a higher share). It is also why more Crown Power raises max tax (`global_estate_max_tax = 0.20 × Crown Power`), cheapens privilege revocation and policy changes, and lifts cabinet efficiency and parliament support — all scaling straight off the Crown's share. (Confirmed again in a separate save at a `38.65%` Crown share: `trade_income → +38.65%`, `global_estate_max_tax → +7.73%`, `parliament_base_support → +19.32%`, and so on — every line still matched, so the linear rule is general, not a one-save coincidence.)
 
 This is why a local Crown Power building and a national Crown Power law help at *different points of the same sum*. The building raises the Crown's contribution from one location (best where pops are many and valuable); the national modifier lifts every location's contribution at once. Both land in the same national Crown Power figure, which governs the trade/food treasury split and estate max-tax ceilings even when income comes from trade rather than local tax base.
 
