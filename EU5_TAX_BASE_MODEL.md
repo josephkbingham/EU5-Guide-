@@ -989,7 +989,17 @@ Estate power is an *input* to several systems, not just a status bar:
 | Crown penalties | Too much total estate power — usually from over-granting privileges — starves Crown Power, and very low Crown Power triggers country-wide penalties. |
 | Estate satisfaction & culture | Primary/accepted culture and matching state religion raise an estate's power and satisfaction; heretic/heathen religion or foreign culture lower both. |
 
-Evidence level: per-pop weights and the cabinet/command/threshold constants are `Exact` from `estates/00_default.txt` and `00_defines.txt`; the high/low-power scaling is `Exact` from the estate `high_power`/`low_power` block comments. The summation form matches the in-game Estates hint (estate power is "summed" from "the pops of each location") and is corroborated by the community wiki; normalizing into the displayed share and the final Crown-versus-estates totalling are `Mixed`, because the engine performs that step.
+**Worked example (in-game tooltip).** The Venetian Patriziato (a Nobles estate) shows the whole chain at once:
+
+- **Pop base:** `1,583 Nobles → 62.84` base Political Power (the per-pop weight after engine scaling — note it is not a raw `× 25`, so a scaling factor applies between pop count and base power).
+- **Modifiers:** that base is lifted by additive percentage modifiers from wealth, subjects, privileges, and laws — `Land Rights +75%`, `Fortification Licenses +75%`, `Feudal Mercenary Contracts +100%`, `Avogadoria de Comùn +50%`, `Elaborate Court Life +20%`, and more (the list continues below the visible area) — reaching **231.70** Political Power.
+- **Share:** `231.70 / 628.38 total = 36.87%` Estate Power — exactly the displayed value, so the normalization is a plain own-over-total ratio.
+- **Above the 0.25 threshold,** the Nobles `high_power` block fires, scaled by `(0.3687 − 0.25) = 0.1187`, and every line matches the tooltip to the decimal:
+  - `nobles_estate_max_tax = -1.0 × 0.1187 =` **−11.87%** maximum tax (the estate resists taxation)
+  - `levy_combat_efficiency_modifier = +1.0 × 0.1187 =` **+11.87%**
+  - `fort_maintenance_efficiency = +1.0 × 0.1187 =` **+11.87%**
+
+Evidence level: per-pop weights and the cabinet/command/threshold constants are `Exact` from `estates/00_default.txt` and `00_defines.txt`. The share normalization (own ÷ total Political Power) and the high/low-power `(relative_power − 0.25)` scaling are `Exact`, confirmed to the decimal against the in-game Estate Power tooltip (worked example above). The summation-over-locations form matches the in-game Estates hint and the community wiki. Only the pop-count → base-power scaling factor and the exact ordering of the percentage modifiers remain engine-side (`Mixed`).
 
 #### Where the Money Goes
 
