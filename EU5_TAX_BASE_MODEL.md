@@ -1062,7 +1062,16 @@ local_crown_estate_power in a location
   -> the gain is proportional to the location's population and pop value
 ```
 
-**Does it feed national Crown Power? Yes.** National Crown Power is the sum over locations of each location's Crown contribution, so a `local_crown_estate_power` building raises the national total — but only by as much as that location's population is worth. The crown-power hint and community sources agree: build it where there are **many high-value pops**, because a Nobles pop is worth ~1,000× a Peasants pop. A Local Crown Power building in a near-empty location barely moves the needle.
+**Does it feed national Crown Power? Yes — because they are the same number.** There are not separate "local" and "national" Crown Powers. There is one national Crown Power, and it is *built by adding up a contribution from every location*. "Local Crown Power" is simply one location's input into that sum, so raising it raises the total directly. Step by step, for a building granting `local_crown_estate_power = +0.20` in a city:
+
+1. **National Crown Power is a share** — the Crown's political power ÷ the total political power of all estates + Crown (e.g. the tooltip's `2816.54 / 7286.74 = 38.65%`).
+2. **The Crown's political power is a sum over locations** — each location adds `(its population) × crown_power_from_population × (1 + that location's local crown power)`. The national tooltip shows the already-summed result.
+3. **The building raises one location's local crown power** by `+0.20`, so that city's term in the sum grows by ~20%.
+4. **The gain is proportional to that location's population** — +20% of a big city's contribution is a lot of political power; +20% of an empty village's is almost nothing. (A Nobles pop is worth ~1,000× a Peasants pop, so high-value pops matter too.)
+5. **A bigger Crown sum = a bigger Crown share** — the added political power goes into the Crown's numerator while the estates' power is unchanged, so the Crown's fraction rises and every estate's drops by the same total (zero-sum).
+6. **A bigger Crown share scales up every Crown effect** — more trade income to the treasury, higher estate max tax, cheaper privileges/policies, better cabinet and parliament — all linearly (see [National Crown Power](#national-crown-power)).
+
+*Numeric sketch.* Country total political power `1000`, Crown holds `380` → Crown Power `38%`. A city contributes `40` of that (its pops, no crown bonus yet). Build a council hall there (`+0.20`): the city's contribution rises to `48` (`+8`). Crown → `388`, total → `1008`, so Crown Power = `388 / 1008 = 38.5%`, and the estates' combined share falls from `62%` to `61.5%`. Build the same hall in a hamlet contributing only `2`, and the `+0.4` it adds is a rounding error. **Same building, very different result — population is the multiplier.**
 
 **How does it affect tax?** Not by giving the Crown a tax-base share — the Crown holds none ([Where the Money Goes](#where-the-money-goes)). It helps the treasury through three indirect channels:
 
