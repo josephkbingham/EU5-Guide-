@@ -1,19 +1,58 @@
 # EU5 Guide
 
-This guide is meant to become a broad Europa Universalis V manual over time. The current pass focuses on the economy: wealth, tax base, control, markets, trade, estates, and the parameters a player can use to reason about economic strategy.
+A working strategy manual for Europa Universalis V, built by reading the installed game files rather than relying on memory or wikis. This edition covers the **economy** end to end: how wealth is created, how much of it becomes taxable, and how it finally reaches the treasury. Military, diplomacy, society, religion, and progression are scaffolded as [planned sections](#planned-sections) and will follow the same file-first method.
 
-Generated from the installed EU5 files at:
+**Generated from:**
 
-`/mnt/d/Program Files/Steam/steamapps/common/Europa Universalis V`
-
-Local build identifiers seen on 2026-06-06:
-
+- Install path: `/mnt/d/Program Files/Steam/steamapps/common/Europa Universalis V`
+- Captured: `2026-06-06`
 - `caesar_branch.txt`: `u26q2/release/next`
 - `caesar_rev.txt` / `binaries/checksum.txt`: `4be9dd2e34196e66a72855407a347f5235e3bd27c2c34fc63a0e2980cc2e8149eed42774`
 
-Source policy: installed game files are authoritative for this guide. Public sources are useful cross-checks, but they can lag behind the local build. Source links and reusable search paths live in the Codex skill `eu5-game-guide`.
+**Source policy:** installed game files are authoritative. Public sources are useful cross-checks, but can lag the local build. Reusable search paths live in the Codex skill `eu5-game-guide`. For a broader catalog of moddable parameters, see [EU5_GAMEPLAY_PARAMETERS.md](EU5_GAMEPLAY_PARAMETERS.md).
 
-## Economy: Quick Mental Model
+## How to Read This Guide
+
+Two label systems run through every table, so you can separate *how much a lever matters* from *how well the game documents it*.
+
+**Strategy weight** — how much the dependency typically moves the outcome. These are prioritization judgments, not claims that each branch has one stable global coefficient.
+
+| Weight | Meaning |
+|---|---|
+| `Critical` | Usually the first-order constraint or multiplier. Fix these first. |
+| `High` | Strongly affects outcomes in many starts. |
+| `Medium` | Often important, but depends on context or a specific branch. |
+| `Low` | Mostly secondary for tax base unless combined with other levers. |
+| `Conditional` | Can dominate in specific markets, geographies, or estate setups. |
+
+**Evidence level** — how directly the claim is backed by the files.
+
+| Evidence | Meaning |
+|---|---|
+| `Exact` | Directly exposed as a formula, coefficient, or file value. |
+| `Derived` | Algebraically inferred from exact pieces. |
+| `Mixed` | Partly file/UI backed, partly engine-side or state-dependent. |
+| `Inferred` | Useful strategy model, but not exposed as a direct formula. |
+
+**Reading the equations:** treat UI percentages as decimals (75% control = `0.75`). An `=` line is exact from the files; a `~=` line is a strategy-level approximation of engine-side math.
+
+**Navigation:** the [Table of Contents](#table-of-contents) lists every section. [Critical Dependencies](#critical-dependencies) is the fastest orientation; the [Dependency Graph](#dependency-graph) is the full map, and every subgraph links back to it.
+
+## Table of Contents
+
+**Economy** (current edition)
+
+1. [Quick Mental Model](#quick-mental-model) — the five-layer summary
+2. [Critical Dependencies](#critical-dependencies) — the levers that decide most outcomes
+3. [Core Equations](#core-equations) — wealth, tax base, estates, prices, trade
+4. [Dependency Graph](#dependency-graph) — the full map and every subgraph
+5. [Parameter Dictionary](#parameter-dictionary) — vocabulary for files and tooltips
+6. [Strategy Checklist](#strategy-checklist) — the order to evaluate an economic action
+7. [Common Strategic Patterns](#common-strategic-patterns) — recipes for typical situations
+
+**Planned Sections** (placeholders): [Military](#military) · [Diplomacy and Subjects](#diplomacy-and-subjects) · [Society and Government](#society-and-government) · [Religion and Culture](#religion-and-culture) · [Progression and Events](#progression-and-events)
+
+## Quick Mental Model
 
 EU5's economy is easiest to read in layers:
 
@@ -32,7 +71,51 @@ The strategic shortcut:
 - Normal player trade routes and autonomous Burgher trade share the same market ecology, but they do not use the same capacity/control surface.
 - Estate composition changes who receives the tax base and how hard the state can tax it.
 
-## Economy: Core Equations
+## Critical Dependencies
+
+If you read nothing else, read this. Treasury income is a chain, and it is only as strong as its weakest link: wealth you cannot control is not taxable, and tax base held by an estate you cannot tax is not income.
+
+**The critical path**
+
+```text
+location_wealth
+   │  × local_control          (control decides how much wealth is taxable)
+   ▼
+location_tax_base
+   │  × estate share           (which estate owns the taxable base)
+   ▼
+estate_tax_base
+   │  × tax rate × efficiency   (only if that estate can be taxed, under caps)
+   ▼
+treasury income
+```
+
+Every `Critical`-weighted lever in the guide sits on this path:
+
+| Lever | Stage | Why it is critical | Detail |
+|---|---|---|---|
+| `local_control` | Tax base | Direct multiplier on wealth. 100 wealth at 50% control = 50 tax base; at 80% = 80. Also feeds local and national Crown Power. | [Control](#control-subgraph) |
+| `location_wealth` | Tax base | The base amount before control. High control over poor land still yields little. | [Location Wealth](#location-wealth-subgraph) |
+| Building profit | Wealth | The most scalable wealth branch; drives towns, cities, and industry. | [Building Wealth](#building-wealth-subgraph) |
+| Output price/quantity vs. input/maintenance cost | Building profit | Expensive inputs erase output gains and can turn a building unprofitable (and idle). | [Building Wealth](#building-wealth-subgraph) |
+| Employment | Building profit | Buildings are efficient in proportion to employed pops; unstaffed buildings sit idle. | [Employees, POP Deficits, and Profit](#employees-pop-deficits-and-profit) |
+| Estate taxability (rate and caps) | Extraction | Tax base only becomes income if the estate holding it can actually be taxed. | [Estate Allocation](#estate-allocation-and-tax-extraction-subgraph) |
+
+**The shortlist** — when you can only do a few things:
+
+1. **Raise control where wealth is already high.** It is the cleanest multiplier and compounds into Crown Power. Rich-but-uncontrolled land is usually the highest-value fix.
+2. **Protect building profitability.** Keep input and maintenance goods cheap and available, and make sure the building can be staffed.
+3. **Check who owns the tax base before celebrating wealth.** An estate you cannot tax converts little of it to treasury.
+
+**The common traps:**
+
+- High-wealth, low-control locations are wasted potential — see [Rich But Uncontrolled Land](#rich-but-uncontrolled-land).
+- A high-output building with bad input prices or poor market access adds little taxable wealth.
+- Expanding into large but low-control populations can *lower* national Crown Power through the average-control path.
+
+Read this together with the [Strategy Checklist](#strategy-checklist), which walks the same chain in evaluation order.
+
+## Core Equations
 
 Use UI percentages as decimals in the equations. For example, 75% control is `0.75`.
 
@@ -136,18 +219,18 @@ For quick estimates, treat `estate_power_modifier_e` as `1` unless the location/
 
 `final_estate_share_e` means the estate share after special transfer rules. The visible peasant value is `Location.GetPeasantEnfranchisment`; the underlying modifier keys use the installed spelling `local_peasant_enfranchisment` and `global_peasant_enfranchisment`.
 
-Installed `tax_per_pop` weights:
+Installed per-pop weights (`estates/00_default.txt`). `tax_per_pop` weights the tax-base split; `power_per_pop` weights [estate power](#estate-power). The two are independent, so an estate can be rich but politically weak (Burghers) or poor but influential (Cossacks). `power_per_pop` is counted **per 1,000 pops** (Nobles `25` = `0.025` political power per pop):
 
-| Estate | `tax_per_pop` | Strategic meaning |
-|---|---:|---|
-| Crown | 0 | Crown power affects trade-income split and tax caps, but crown pops do not take local tax-base share. |
-| Nobles | 100 | Dominant per-pop claim on wealth; noble-heavy locations shift tax base to nobles. |
-| Clergy | 25 | Meaningful tax-base share, below burghers and nobles. |
-| Burghers | 40 | Strong urban/commercial claim; often tied to trade and production modifiers. |
-| Peasants | 1 | Large numbers can matter, but each pop has low weight. |
-| Dhimmi | 1 | Same low per-pop tax-base weight as peasants in this build. |
-| Tribes | 0.01 | Very low per-pop taxable share. |
-| Cossacks | 0.02 | Very low per-pop taxable share. |
+| Estate | `tax_per_pop` | `power_per_pop` | Strategic meaning |
+|---|---:|---:|---|
+| Crown | 0 | 0 | Crown pops take neither tax-base share nor per-pop power; Crown Power comes from population, command, cabinet, and modifiers instead. |
+| Nobles | 100 | 25 | Dominant claim on both wealth and influence; noble-heavy locations shift tax base and political power to Nobles. |
+| Clergy | 25 | 10 | Meaningful tax and power weight, below Nobles. |
+| Burghers | 40 | 4 | Strong tax claim but modest per-pop power: commercial wealth without proportional political weight. |
+| Peasants | 1 | 0.025 | Huge numbers, tiny per-pop weight; one Nobles pop outweighs ~1,000 Peasants pops in power. |
+| Dhimmi | 1 | 0.02 | Low on both. |
+| Tribes | 0.01 | 0.01 | Very low on both. |
+| Cossacks | 0.02 | 0.5 | Low tax weight but relatively high per-pop power for a non-elite estate. |
 
 Peasant enfranchisement decides how much of the Peasants estate's wealth share peasants actually keep. The rest is transferred to Nobles:
 
@@ -278,24 +361,11 @@ Evidence level: mixed/inferred. Installed localization says Burghers attempt to 
 
 Other pops create demand and work in buildings/RGOs, but they do not have an equivalent autonomous `trades_per_<pop>` capacity in the installed files. In this build, the named autonomous pop-trade system is Burgher-specific.
 
-## Economy: Dependency Graph
+## Dependency Graph
 
-Weight labels are strategy weights, not a claim that every branch has one stable global coefficient.
+This is the full map of the economy. Weight and evidence labels are defined in [How to Read This Guide](#how-to-read-this-guide). Start at the top-level graph, then follow any branch into its subgraph; every subgraph links back here. Indentation shows what feeds what.
 
-- `Critical`: usually the first-order constraint or multiplier.
-- `High`: strongly affects outcomes in many starts.
-- `Medium`: often important, but depends more on context or specific branch.
-- `Low`: mostly secondary for tax base unless combined with other levers.
-- `Conditional`: can dominate in specific markets, geographies, or estate setups.
-
-Evidence labels:
-
-- `Exact`: directly exposed as a formula, coefficient, or file value.
-- `Derived`: algebraically inferred from exact pieces.
-- `Mixed`: partly file/UI backed, partly engine-side or state-dependent.
-- `Inferred`: useful strategy model, but not exposed as a direct formula.
-
-Top-level economy graph:
+**Top-level economy graph:**
 
 - [Country Aggregation](#country-aggregation-subgraph) `[Weight: High, Exact]`
 - [Location Tax Base](#location-tax-base-subgraph) `[Weight: Critical, Exact]`
@@ -312,7 +382,7 @@ Top-level economy graph:
 
 ### Country Aggregation Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 country_tax_base
@@ -333,7 +403,7 @@ Player rule: when comparing expansion targets, do not only ask "how much wealth 
 
 ### Location Tax Base Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 location_tax_base
@@ -356,7 +426,7 @@ Player rule: prioritize control where wealth is already high, and build wealth w
 
 ### Location Wealth Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 location_wealth
@@ -378,7 +448,7 @@ Player rule: local wealth is not the same as production volume. A high-output bu
 
 ### RGO Wealth Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 RGO_profit
@@ -433,7 +503,7 @@ Player rule: expand valuable RGOs when the location can access a market, employ 
 
 ### Building Wealth Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 building_profit
@@ -561,7 +631,7 @@ Player rule: build where the output is valuable, inputs are affordable, market a
 
 ### Burgher Trade Wealth Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 burgher_trade_wealth
@@ -640,7 +710,7 @@ Player rule: Burghers are powerful in commercial economies, but commercial power
 
 ### Goods Demand And Prices Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 market_price
@@ -691,7 +761,7 @@ Player rule: prices are not simply "good if high." High prices help producers of
 
 ### Market Access Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 market_access
@@ -729,7 +799,7 @@ Player rule: access infrastructure multiplies other economic plans. Build roads,
 
 ### Storage And Stockpiles Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 market stockpile
@@ -766,7 +836,7 @@ Player rule: storage is a shock absorber. It usually will not make a poor locati
 
 ### Control Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 local_control
@@ -827,7 +897,7 @@ For poor, sparsely populated locations, build wealth or strategic infrastructure
 
 ### Estate Allocation And Tax Extraction Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 treasury tax income
@@ -877,9 +947,85 @@ Installed tax cap examples:
 
 Player rule: a tax-base increase only becomes treasury income if the estate holding that share can be taxed. Estate management is part of economic optimization, not a separate political minigame.
 
+#### Estate Power
+
+Estate Power is an estate's **share of the country's total Political Power** — its clout in government. The concept text is explicit: Political Power "is used to calculate `estate_power`," each pop "exerts a different amount of Political Power dependent on the estate they belong to," and "the total power of the estates reduces the `crown_power` of the country." So estate power is a *relative share*: raising one estate's power lowers everyone else's, and Crown Power is what remains after the estates take their slices.
+
+```text
+estate_power_e =
+    ( SUM over locations [ SUM over pop types (pop_count / 1000 * power_per_pop_e) ]   # power_per_pop is per 1,000 pops
+      * (1 + local_modifier_e) )        # local_<estate>_estate_power, applied per location
+    * (1 + national_modifier_e)         # global_<estate>_estate_power, crown_power_from_population, ...
+
+# then shown as a share of the whole pie:
+estate_power_share_e =
+    estate_power_e / total_power(all estates + Crown)
+```
+
+Two consequences follow from the `SUM over locations`:
+
+- Estate power is **national, but built from locations.** Each location contributes `population × power_per_pop`, scaled by that location's `local_<estate>_estate_power`. So local estate-power modifiers (Local Crown Power included) **roll up into the national total**, weighted by how populous the location is — see [Local Crown Power From Buildings](#local-crown-power-from-buildings).
+- It is a **zero-sum share.** The in-game Estates hint calls it "a zero-sum distribution" between the estates and the Crown: raising one estate's power lowers everyone else's, and Crown Power is simply the Crown's slice of the same pie.
+
+`power_per_pop` is the dominant input, and it is **separate from the `tax_per_pop`** weight used for the wealth/tax-base split — an estate can be wealthy but politically weak (Burghers: tax 40, power 4) or poor but influential (Cossacks: tax 0.02, power 0.5). `power_per_pop` is counted **per 1,000 pops**, so a Nobles pop (`25` → `0.025` each) wields about 1,000× the political power of a Peasants pop (`0.025` → `0.000025` each). Characters an estate places in the cabinet or in army/navy command add power too — the worked example below shows two cabinet members at `+12.50%` each (underlying defines `BASE_ESTATE_POWER_FROM_CABINET` / `_FROM_COMMAND = 0.25`). See the [per-pop weights table](#estate-shares-and-tax-income) for all estates.
+
+Installed constants (`loading_screen/common/defines/00_defines.txt`):
+
+| Define | Value | Meaning |
+|---|---:|---|
+| `BASE_ESTATE_POWER_FROM_CABINET` | `0.25` | Power an estate gains per character it has appointed to the cabinet. |
+| `BASE_ESTATE_POWER_FROM_COMMAND` | `0.25` | Power an estate gains per character it has commanding an army or navy. |
+| `LOW_POWER_THRESHOLD` | `0.25` | The 25% pivot. An estate's `high_power` effects scale with `(power - 0.25)` when above it; its `low_power` effects scale with `(0.25 - power)` when below it. |
+
+The Crown is special: it has `power_per_pop = 0`, so it gains nothing from ordinary pops. Crown Power instead comes from `crown_power_from_population` (base `1.0`, modified by average control via `average_control_50`), `base_crown_estate_power_modifier`, `global_crown_estate_power`, cabinet/command characters, and privileges/laws/advances — see [National Crown Power](#national-crown-power).
+
+Estate power is an *input* to several systems, not just a status bar:
+
+| Consequence | Mechanism |
+|---|---|
+| Tax-base split | Each location's tax base is split among estates by **population weight** (`tax_per_pop`), *not* by estate power — see [Where the Money Goes](#where-the-money-goes). |
+| Trade-income split | Trade income is divided between Crown and estates by estate power; only the Crown Power share reaches the treasury. |
+| Max-tax effects | Above the 0.25 threshold an estate's `high_power` block applies (e.g., Nobles `nobles_estate_max_tax = -1.0`, scaled by how far over the threshold they sit); below it the `low_power` block raises max tax (e.g., `+0.5`). |
+| Crown penalties | Too much total estate power — usually from over-granting privileges — starves Crown Power, and very low Crown Power triggers country-wide penalties. |
+| Estate satisfaction & culture | Primary/accepted culture and matching state religion raise an estate's power and satisfaction; heretic/heathen religion or foreign culture lower both. |
+
+**Worked example (in-game tooltips).** Two Venetian Nobles tooltips show the whole chain.
+
+*Per-location base* (Nobles in Cioxa) states the per-pop rule outright — "Base Political Power of **134 Nobles** (`+25.00 for every 1,000 Pops`): **3.36**," i.e. `134 × 25/1000 = 3.36`. That base is then multiplied by a stack of additive percentage modifiers: estate-wide privileges (`Land Rights +75%`, `Fortification Licenses +75%`, `Feudal Mercenary Contracts +100%`, `Avogadoria de Comùn +50%`), location effects (`Noble Navy +33%`, `Plenty of Opportunities −13.53%`, `Council of Ten −10%`), and **each cabinet character the estate holds** (`Lazzaro Dandolo +12.50%`, `Nicolò Gradenigo +12.50%`).
+
+*National total* (the Patriziato) sums every location's contribution and reports the share: **231.70** of **628.38** total Political Power = **36.87%**, exactly the displayed Estate Power — so the share is a plain own-over-total ratio.
+
+*Threshold effects* use that **national** 36.87% share — the Cioxa tooltip itself labels them "Estate Power of the Patriziato is above 25.00%." Scaled by `(0.3687 − 0.25) = 0.1187`, every line matches to the decimal:
+
+- `nobles_estate_max_tax = -1.0 × 0.1187 =` **−11.87%** maximum tax (the estate resists taxation)
+- `levy_combat_efficiency_modifier = +1.0 × 0.1187 =` **+11.87%**
+- `fort_maintenance_efficiency = +1.0 × 0.1187 =` **+11.87%**
+
+Evidence level: per-pop weights and the cabinet/command/threshold constants are `Exact` from `estates/00_default.txt` and `00_defines.txt`. The share normalization (own ÷ total Political Power) and the high/low-power `(relative_power − 0.25)` scaling are `Exact`, confirmed to the decimal against the in-game Estate Power tooltip (worked example above). The summation-over-locations form matches the in-game Estates hint and the community wiki. Only the pop-count → base-power scaling factor and the exact ordering of the percentage modifiers remain engine-side (`Mixed`).
+
+#### Where the Money Goes
+
+A common misconception is that all of a location's money is handed out in proportion to estate power. It is not — **two different distributions run in parallel, and only one of them uses estate power.**
+
+**1. Tax base (a location's wealth) → split among estates by population, then taxed.** The in-game concept is explicit: a location's wealth "is distributed among the estates according to their **relative population**... Nobles get a much bigger share per capita than Burghers, which in turn get a much bigger share per capita than Peasants." That per-capita weight is `tax_per_pop`, *not* estate power. The Crown (`tax_per_pop = 0`) takes **none** of it — the estates hold the entire tax base. The treasury then collects income only by **taxing** each estate's share:
+
+```text
+estate_tax_income_e =
+    estate_wealth_share_e          # population * tax_per_pop, after peasant enfranchisement
+  * effective_tax_rate_e           # bounded by that estate's min / max tax
+  * (1 + tax_income_efficiency)
+  - estate_enrichment
+```
+
+As the Estates hint puts it: *"The Estates collect all the tax base from our locations, and we only get as much as we tax out of them."* Estate **power** still matters here, but indirectly — a high-power estate has a lower **max tax**, so you cannot tax its share as hard.
+
+**2. Trade and food profit/cost → split between Crown and estates by estate power.** This is the distribution that *is* proportional to estate power. The Crown's percentage — i.e. **Crown Power** — goes straight to the treasury; the rest is divided among the estates by their estate power. Per the crown-power hint: *"At 50% Crown Power, half of the expenses and profits for trade and food will go directly into the treasury, while the other half will be distributed among the estates, according to their respective estate power."*
+
+So, directly: **money from a location is not simply handed out in proportion to estate power.** Tax base is split by *population weight* and must be *taxed* out of the estates (with estate power setting the tax ceiling); only trade and food income is split *directly* by estate power, with the Crown's share reaching the treasury automatically. Note also that a location at `0%` control generates **no taxes at all**, even though the estates still hold and benefit from its wealth.
+
 #### Peasant Enfranchisement
 
-Peasant enfranchisement is a wealth-share redirect. The Peasants estate has `disenfranchise_to = nobles_estate`, and the UI tooltip says peasants receive only their average enfranchisement percentage of their wealth share; the rest goes to Nobles.
+Peasant enfranchisement is a redirect *within* the wealth-share distribution above: it sets how much of the **Peasants' own share** the Peasants keep, sending the rest to the Nobles. The Peasants estate has `disenfranchise_to = nobles_estate`, and the tooltip says peasants "only receive that percentage of their wealth share. The rest of their income is transferred to the Nobles." It depends mostly on the free-subjects societal value; towns and cities enfranchise more than rural locations, and some buildings shift it.
 
 ```text
 peasant_enfranchisement_final = Location.GetPeasantEnfranchisment
@@ -907,27 +1053,32 @@ Installed examples:
 
 #### Local Crown Power From Buildings
 
-The building modifier is `local_crown_estate_power`, localized as Local Crown Power. It is a location-category estate-power modifier. The installed localization says it affects the estate power of the government, or Crown Power, in that location.
+The building modifier is `local_crown_estate_power`, localized as Local Crown Power. In the [estate-power formula](#estate-power) it is the location's `local_modifier` for the Crown — it scales how much that one location's population counts toward Crown Power.
 
 ```text
-local_crown_estate_power building
-  -> higher Crown estate power in that location
-  -> lower relative estate dominance there
-  -> better treasury result only through allocation, tax caps, or Crown/estate income splits
+local_crown_estate_power in a location
+  -> that location's population counts for more Crown power
+  -> because national Crown Power SUMS all locations, the national figure rises too
+  -> the gain is proportional to the location's population and pop value
 ```
 
-Use it as an extraction modifier, not a growth modifier. It does not raise `wealth`, prices, output, market access, or control on its own. In a rich but estate-dominated location, it can improve how much existing economy the state captures; in a poor location, there is little existing income to redirect.
+**Does it feed national Crown Power? Yes.** National Crown Power is the sum over locations of each location's Crown contribution, so a `local_crown_estate_power` building raises the national total — but only by as much as that location's population is worth. The crown-power hint and community sources agree: build it where there are **many high-value pops**, because a Nobles pop is worth ~1,000× a Peasants pop. A Local Crown Power building in a near-empty location barely moves the needle.
 
-Control also contributes to local Crown Power through the `inverse_control` static modifier:
+**How does it affect tax?** Not by giving the Crown a tax-base share — the Crown holds none ([Where the Money Goes](#where-the-money-goes)). It helps the treasury through three indirect channels:
+
+- **Trade and food split:** higher Crown Power sends a larger share of trade/food profit straight to the treasury instead of to the estates.
+- **Higher tax ceilings:** Crown Power and estate power are zero-sum, so more Crown Power means less estate power, which **raises the max tax** you can levy on the estates that actually hold the wealth.
+- **Governance:** easier laws, better cabinet efficiency, and more parliament base support.
+
+So treat it as an **extraction and centralization lever, not a growth lever** — it does not raise wealth, prices, output, market access, or control on its own.
+
+Control pushes the *other* way through the `inverse_control` static modifier, which applies `local_crown_estate_power = -1.0` scaled by `(1 - local_control)`:
 
 ```text
-inverse_control_factor = 1 - local_control
-
-local_crown_power_from_control =
-    -1.0 * inverse_control_factor
+local_crown_power_from_control = -1.0 * (1 - local_control)
 ```
 
-So a building with `local_crown_estate_power = 0.25` in a `60%` control location first has to offset about `-40%` Local Crown Power from low control. This is a separate local modifier from any Crown Power granted by the building itself.
+So a building granting `local_crown_estate_power = 0.25` in a `60%`-control location must first offset roughly `-40%` Local Crown Power from low control. This is also why **raising control in your most populous locations is itself one of the strongest national Crown Power levers** — the crown-power hint names "the control of our most populated locations" as a primary driver.
 
 Installed building examples:
 
@@ -939,7 +1090,7 @@ Installed building examples:
 
 #### National Crown Power
 
-Country-scope Crown Power is built from country modifiers, population contribution, base Crown power, privileges, laws, reforms, advances, average control, and the pressure of non-Crown estates. The installed files expose these key modifiers:
+National Crown Power is the Crown's slice of the zero-sum estate-power pie — which, by the [estate-power formula](#estate-power), is the **sum over every location** of the Crown's population contribution, scaled by local and national modifiers. So it is built from population, the `local_crown_estate_power` in each location (including the `inverse_control` penalty for low control), the privileges granted to estates (which raise *their* power and so lower the Crown's), and the country-scope modifiers below:
 
 ```text
 global_crown_estate_power
@@ -982,24 +1133,46 @@ normal_trade_profit
   -> treasury receives Crown Power percentage
 ```
 
-This is why a local Crown Power building and a national Crown Power law can both help the state but at different layers. The building fights the local allocation problem in one location. The national modifier changes the country's overall Crown/estate balance and therefore matters even when income comes from trade routes rather than local tax base.
+**Worked example (in-game tooltip).** The Venetian Republic (the Crown estate) shows Crown Power forming and paying out. Its share is `79.10 / 628.38 = 12.58%` — the same own-over-total ratio as any estate, against the same `628.38` country total seen in the Patriziato tooltip.
+
+Because the Crown has `power_per_pop = 0`, its power comes from **population via `crown_power_from_population`**: `365K` pops give a base of `74.82`, then modified by `Crown Power from Population −26.89%` (the low-average-control penalty through `average_control_50`, plus laws), `Ruler's Administrative Ability +18%`, the `Doge in command +16.66%`, difficulty (`Very Easy +25%`), and reforms (`Zonta`, `Council of Forty`, `Traditional Distribution`) — netting `79.10`.
+
+The payoff is the key part: unlike estates (which use `high_power`/`low_power` around the `0.25` threshold), the `crown_estate` has a single `power` block whose every line is multiplied **linearly by the Crown's share**. At `12.58%`, each line matches the tooltip to the decimal:
+
+| `crown_estate.power` line | Result = base × 0.1258 |
+|---|---|
+| `trade_income = 1.0` | **+12.58%** trade income to treasury |
+| `revoke_privilege_cost_modifier = -1.0` | **−12.58%** |
+| `country_cabinet_efficiency = 0.5` | **+6.29%** |
+| `parliament_base_support = 0.5` | **+6.29%** |
+| `change_policy_cost_modifier = -0.5` | **−6.29%** |
+| `estate_building_destruction_satisfaction_impact = -0.5` | **−6.29%** |
+| `global_estate_max_tax = 0.20` | **+2.51%** |
+| `power_projection = 5` | **+0.62** |
+| `diplomatic_reputation = 2` | **+0.25** |
+| `remove_bureaucracy_price_cost_modifier = -0.25` | **−3.14%** |
+| `maintain_bureaucracy_price_cost_modifier = -0.05` | **−0.62%** |
+
+This is the exact mechanism behind the trade/food split: `trade_income = 1.0` means **treasury trade share = Crown Power** (here 12.58%; the hint's "50% Crown Power → half of trade" is the same line at a higher share). It is also why more Crown Power raises max tax (`global_estate_max_tax = 0.20 × Crown Power`), cheapens privilege revocation and policy changes, and lifts cabinet efficiency and parliament support — all scaling straight off the Crown's share.
+
+This is why a local Crown Power building and a national Crown Power law help at *different points of the same sum*. The building raises the Crown's contribution from one location (best where pops are many and valuable); the national modifier lifts every location's contribution at once. Both land in the same national Crown Power figure, which governs the trade/food treasury split and estate max-tax ceilings even when income comes from trade rather than local tax base.
 
 Current-build caveat: control now reaches Crown Power through two visible paths. Locally, low control applies an `inverse_control` penalty to Local Crown Power. Nationally, average control modifies the Crown's population-based power. The second path is not shown as a redistribution to a specific rival estate; it changes the Crown's population multiplier. For strategy, treat this as a compound penalty for low-control population rather than as a simple zero-sum estate transfer.
 
-For non-Crown estates with taxable pops, local power affects income by changing who controls the taxable base, not by creating source wealth by itself:
+For non-Crown estates, raising their power adds to *their* slice of the same zero-sum pie. It can tilt the local wealth share toward that estate, but its larger and more certain effects are on **taxability and the trade/food split**:
 
 ```text
 more local_<non_crown_estate>_estate_power
-  -> larger local estate share of tax base
-  -> more income only if that estate has a usable tax rate/cap
-  -> less useful if the estate is hard to tax or has high-power max-tax penalties
+  -> that estate holds more power locally, and (summed) nationally
+  -> its max tax falls (powerful estates resist taxation); its trade/food/parliament weight rises
+  -> usually a net negative for the treasury unless you can still extract from it
 ```
 
 Country-level estate power also matters because total estate power reduces Crown Power. Lower Crown Power reduces the treasury share of normal trade income, since installed concepts say only the Crown Power share of trade income reaches the treasury. Crown-specific local power is therefore best read as a local extraction and centralization lever, national Crown Power as a country-wide state-capacity lever, and non-Crown local estate power as a local taxable-share lever.
 
 ### Trade And Naval Economy Subgraph
 
-[Back to top graph](#economy-dependency-graph)
+[Back to top graph](#dependency-graph)
 
 ```text
 trade and naval economy
@@ -1136,7 +1309,7 @@ Trade UI parameter map:
 
 Player rule: trade capacity is often good even where control is low because trade income does not scale down by local control the way tax base does. The indirect price effects still depend on the market and production network.
 
-## Economy: Parameter Dictionary
+## Parameter Dictionary
 
 This is the minimum vocabulary for reading economic modifiers in files and tooltips.
 
@@ -1173,7 +1346,10 @@ This is the minimum vocabulary for reading economic modifiers in files and toolt
 | `ESTABLISHMENT_SYSTEM_ENABLED` | Installed define controlling whether building establishment throughput/bonus is active. Current checked value is `no`. | `loading_screen/common/defines/00_defines.txt`. |
 | `local_building_establishment_speed`, `global_building_establishment_speed` | Establishment speed modifiers; only income-relevant if establishment is enabled. | modifier definitions, localization, laws, privileges, societal values. |
 | `tax_per_pop` | Estate weight for local wealth share. | `estates/00_default.txt`. |
-| `power_per_pop` | Estate political-power weight per pop. | `estates/00_default.txt`. |
+| `power_per_pop` | Estate political-power weight per pop (drives [estate power](#estate-power)); separate from `tax_per_pop`. | `estates/00_default.txt`. |
+| `estate_power` | An estate's share of total country Political Power; input to tax-base split, trade-income split, max-tax effects, and Crown Power. | estate UI, `estate_power(estate_type:X)` triggers, game concepts. |
+| `BASE_ESTATE_POWER_FROM_CABINET` / `BASE_ESTATE_POWER_FROM_COMMAND` | Estate power per character in the cabinet / commanding units; both `0.25` in this build. | `loading_screen/common/defines/00_defines.txt`. |
+| `LOW_POWER_THRESHOLD` | The 25% pivot that decides whether an estate's `high_power` or `low_power` effects apply and how strongly. | `loading_screen/common/defines/00_defines.txt`. |
 | `local_<estate>_estate_power` | Location modifier that shifts local estate power; for non-Crown estates this can shift local tax-base allocation. | buildings, town rights, local modifiers. |
 | `global_<estate>_estate_power` | Country modifier that shifts estate power more broadly. | laws, privileges, reforms, modifiers. |
 | `local_crown_estate_power` | Location modifier localized as Local Crown Power; affects Crown/government estate power in that location only. | council halls, town buildings, forts, estate buildings, town rights. |
@@ -1206,7 +1382,7 @@ This is the minimum vocabulary for reading economic modifiers in files and toolt
 
 For broader parameter discovery, use `EU5_GAMEPLAY_PARAMETERS.md` as the project-level catalog.
 
-## Economy: Strategy Checklist
+## Strategy Checklist
 
 When choosing an economic action, walk the chain in order:
 
@@ -1221,7 +1397,7 @@ When choosing an economic action, walk the chain in order:
 9. Does storage protect the production chain from shortages?
 10. Does the action support future guide goals such as military logistics, control, diplomacy, or expansion?
 
-## Economy: Common Strategic Patterns
+## Common Strategic Patterns
 
 ### Rich But Uncontrolled Land
 
@@ -1278,9 +1454,9 @@ Best levers:
 
 Why: tax base is not treasury income until it passes through estate allocation and tax extraction.
 
-## Future Guide Sections
+## Planned Sections
 
-These sections are intentionally placeholders. Add them later using the same rule: inspect installed game files first, then cross-check public sources only as secondary context.
+These are intentional placeholders for future editions. Each will be built with the same rule the economy section followed: inspect installed game files first, then cross-check public sources only as secondary context.
 
 ### Military
 
