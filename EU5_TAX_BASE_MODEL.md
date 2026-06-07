@@ -1275,6 +1275,18 @@ Trade UI parameter map:
 
 Player rule: trade capacity is often good even where control is low because trade income does not scale down by local control the way tax base does. The indirect price effects still depend on the market and production network.
 
+#### Community Analysis: Trade System Goals
+
+- [On Trade: Trade Routes, Prices, Production, and the Gameplay Goals of a Trade System](https://forum.paradoxplaza.com/forum/threads/on-trade-trade-routes-prices-production-and-the-gameplay-goals-of-a-trade-system.1922327/) — a long community write-up (not an official dev diary) walking through how trade currently resolves (route profit as sell price with efficiencies minus buy price minus transport cost, with transport cost driven by good weight, distance, and trade range) and proposing changes aimed at richer regional price gradients and more sustainable long-distance trade. Concepts worth knowing when reasoning about the model in this guide:
+  - **Trade friction** — the author's term for the total cost of moving a good between markets (transport cost, merchant minimum margins, frictions like piracy/tariffs, offset by trade efficiency). Higher friction widens the price gap between producing and consuming markets, which is what creates room for merchant profit; very large trade-range bonuses can flatten that gradient and reduce profitable opportunities.
+  - **Selling/import/export efficiency as multipliers on price** can in extreme cases make a route profitable even when the destination price is *lower* than the source price (effectively negative friction), which the post argues equalizes prices across markets and erodes profit margins; it proposes these efficiencies instead multiply the *profit margin* rather than the sale price.
+  - **Consumer vs. industrial goods** — shortages of industrial inputs (e.g. tools, charcoal, iron) cascade through dependent production chains far more harshly than shortages of consumer goods, making any industrial deficit an emergency; the post suggests output shouldn't drop until shortages are severe (e.g. ~50%), with buildings instead losing profitability (and scaling down gradually, level by level) before they lose throughput.
+  - **Output vs. throughput modifiers** — the post argues throughput modifiers (scaling both inputs and outputs together) make buildings easier to balance against input/output prices than flat output multipliers.
+  - **Common vs. rare goods** — common goods (iron, fibers) compete mainly on efficiency/cost advantages, while rare goods (cloves, spices) have a price floor set by production cost plus the transport cost of the cheapest route; the post proposes a "flexible base price" for rare goods that drifts toward production cost plus shipping cost over time, so long-distance trade in rare goods stays viable without requiring enormous trade capacity.
+  - **Routing realism** — the post also argues trade paths should hug rivers and coasts more strongly (with real costs for switching between sea/river/land legs) rather than cutting overland through unrelated regions.
+
+  Treat this as one experienced player's design critique and proposal set, useful for understanding *why* the trade levers in this guide (merchant capacity, trade range, trade income, selling/import/export efficiency, market access) behave the way they do and where the community sees friction — not as a description of confirmed or upcoming game behavior. Per this guide's source policy, the installed game files remain authoritative for exact current values.
+
 ## Parameter Dictionary
 
 This is the minimum vocabulary for reading economic modifiers in files and tooltips.
