@@ -581,6 +581,27 @@ Key files:
 
 Player rule: build where the output is valuable, inputs are affordable, market access is good, and labor exists or can be created quickly. Industrial goods should often be kept cheap if many domestic buildings consume them as inputs or maintenance.
 
+**Worked example — Gunsmith in Ferara (in-game tooltip).** This traces one building from raw profit to treasury tax, and explains why the building *list* and the *detail tooltip* show different numbers.
+
+Raw economics of the whole Level-3 building:
+
+```text
+Income (guns sold)       +8.99
+  − Cast Bronze Barrels  −6.00      # input good
+  − Lead Shot            −0.29      # input good
+  = Building profit      +2.69      # total across all 3 levels
+```
+
+From profit to treasury, **per level**:
+
+```text
+building_profit_per_level = 2.69 / 3 levels         = +0.89   # added to location WEALTH
+tax_base_per_level        = 0.89 × control(90.73%)  = +0.81   # the −9.26% is the (1 − control) haircut
+tax_per_level             = 0.81 × extraction(~43%) = +0.35   # estate share × tax rate × caps × efficiency
+```
+
+So the building list's two columns are the **first and last** links of that chain — `+0.89` wealth/level and `+0.35` tax/level — while the detail tooltip also shows the step between (`+0.81` taxable profit/level) and the raw economics (`+2.69`). The crucial distinction: the list shows the **marginal, per-level** value of one *more* level, whereas the tooltip's `+2.69 Profit` is the **whole current building** (3 levels), which ÷ 3 ≈ the list's `+0.89`. At Level 3 the building holds `0.81 × 3 = +2.44` tax base, of which the state taxes `+1.05` (≈ 43%). One tooltip, confirming three core equations: `building_profit = income − inputs`, `tax_base = wealth × control`, and `tax = tax_base × extraction`.
+
 ### Burgher Trade Wealth Subgraph
 
 [Back to top graph](#dependency-graph)
