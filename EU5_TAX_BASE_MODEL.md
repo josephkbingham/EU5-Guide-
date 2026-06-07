@@ -117,7 +117,7 @@ Read this together with the [Strategy Checklist](#strategy-checklist), which wal
 
 ## Core Equations
 
-Use UI percentages as decimals in the equations. For example, 75% control is `0.75`.
+The formulas behind the economy, kept together for reference. The [Dependency Graph](#dependency-graph) turns each into a strategy tree with weights, and the [Parameter Dictionary](#parameter-dictionary) defines the symbols. (UI percentages are decimals: 75% control = `0.75`; `=` is exact from the files, `~=` is a strategy approximation.)
 
 ### Wealth And Tax Base
 
@@ -232,69 +232,9 @@ Installed per-pop weights (`estates/00_default.txt`). `tax_per_pop` weights the 
 | Tribes | 0.01 | 0.01 | Very low on both. |
 | Cossacks | 0.02 | 0.5 | Low tax weight but relatively high per-pop power for a non-elite estate. |
 
-Peasant enfranchisement decides how much of the Peasants estate's wealth share peasants actually keep. The rest is transferred to Nobles:
+Two adjustments shift these shares before the estate is taxed: **peasant enfranchisement** redirects part of the Peasants' share to the Nobles (Peasants keep their enfranchisement %, Nobles get the rest), and **estate enrichment** reduces estate tax-base income. These — along with the full Crown-and-estate-power treatment (how `estate_power` is computed, how `local_crown_estate_power` rolls up into national Crown Power, the `crown_power_from_population` and `inverse_control` paths, the `0.25` high/low-power threshold, and worked examples from the game UI) — are detailed in the [Estate Allocation And Tax Extraction](#estate-allocation-and-tax-extraction-subgraph) subgraph.
 
-```text
-peasants_kept_share = peasant_share * peasant_enfranchisement_final
-nobles_gain_from_peasants = peasant_share * (1 - peasant_enfranchisement_final)
-```
-
-Example: if the final displayed peasant enfranchisement is `25%`, Peasants keep `25%` of their Peasants estate share and Nobles receive the other `75%`. Higher enfranchisement shifts income away from Nobles and toward Peasants; lower enfranchisement does the opposite. Whether this raises treasury income depends on which estate can actually be taxed at useful rates and caps.
-
-Local Crown Power from buildings is exposed as `local_crown_estate_power`. It is a location-scope modifier, not the same lever as country-scope `global_crown_estate_power` or `crown_power_from_population`. It does not add wealth, production, price, or control by itself. It raises the Crown estate's local power, so its income effect is an extraction effect through estate/Crown mechanics rather than a production effect:
-
-```text
-more local_crown_estate_power in one location
-  -> more local Crown estate power
-  -> less relative room for non-Crown estate dominance in that location
-  -> better state capture only if local allocation, estate taxability, or downstream Crown/estate effects improve
-```
-
-National Crown Power uses country-scope modifiers:
-
-```text
-effective_crown_power_from_population =
-    1.0
-  + 0.5 * (average_country_control - 0.50)
-  + other_crown_power_from_population_modifiers
-
-national_crown_power_shape ~=
-    base Crown contribution
-  * (1 + base_crown_estate_power_modifier)
-  + population contribution * effective_crown_power_from_population
-  + global_crown_estate_power
-  - relative pressure from non-Crown estate power
-```
-
-The `average_country_control` line is exact from static modifiers: `average_control_50` applies `crown_power_from_population = 0.5` around a 50% control midpoint. Example: `28.36%` average control gives roughly `(0.2836 - 0.50) * 0.5 = -10.82%` Crown Power from Population, matching the observed UI. The full national Crown Power aggregation remains a shape model because the final political-power aggregation/order is engine-side.
-
-Control also applies a local Crown Power penalty through `inverse_control`:
-
-```text
-inverse_control_factor = 1 - local_control
-
-local_crown_power_from_control =
-    -1.0 * inverse_control_factor
-```
-
-Example: `60.54%` local control gives `-39.46%` Local Crown Power. This is separate from the tax-base equation, so control has multiple outputs: taxable capture, local Crown Power, and a national average-control effect on Crown Power from Population.
-
-The practical difference is:
-
-| Lever | Scope | Main income meaning |
-|---|---|---|
-| `local_crown_estate_power` | One location | Can improve capture of existing local tax base; strongest in rich, estate-dominated locations. |
-| `global_crown_estate_power` | Entire country | Raises country-wide Crown Power/Crown estate power; important for national estate pressure, tax caps/effects, and trade-income treasury share. |
-| `crown_power_from_population` | Entire country | Changes how much Crown estate power is generated from population across the country. |
-| `base_crown_estate_power_modifier` | Entire country | Modifies base Crown Power from Crown-estate political power. |
-
-The visible control penalty is not a direct zero-sum transfer to a named estate. Low control reduces local Crown Power and reduces the national Crown population multiplier, but the static modifiers do not show a matching automatic `local_nobles_estate_power`, `local_burghers_estate_power`, or other estate-power gain from that same control penalty. Non-Crown estates still gain power through their own pops, wealth, privileges, laws, and local modifiers.
-
-The exact local conversion is partly engine-side, and Crown has `tax_per_pop = 0` and `power_per_pop = 0`, so do not model this as the Crown receiving a normal pop-based tax-base share like Nobles or Burghers. Evaluate local Crown Power buildings in rich locations first. A `local_crown_estate_power` building in a poor location has little income to improve; in a rich location it can matter because less estate dominance can mean more money reaching the treasury or fewer estate-power penalties. If the same building also gives `local_max_control`, production, capacity, or trade modifiers, those separate modifiers can create additional income through their own branches.
-
-Evidence level: estate weights are exact from `estates/00_default.txt`; peasant transfer is exact from the peasant-enfranchisement tooltip and Peasants estate `disenfranchise_to = nobles_estate`; local/global Crown Power modifier categories are exact from modifier definitions and localization; the `inverse_control` and `average_control_50` paths are exact from static modifiers; the final Crown/estate political-power aggregation is a strategy model because exact engine ordering is not fully exposed.
-
-Estate enrichment is a reduction layer on estate tax-base income. The concept text confirms it applies, but exact ordering is engine-side, so the guide treats it separately from source wealth.
+Evidence: estate weights are `Exact` from `estates/00_default.txt`; the peasant transfer is `Exact` from the enfranchisement tooltip and `disenfranchise_to = nobles_estate`; the final political-power aggregation and the enrichment ordering are engine-side (`Mixed`).
 
 ### Market Price Path
 
@@ -314,52 +254,64 @@ Evidence level: concept text confirms this shape. The full price function is eng
 
 ### Trade Profit And Income
 
-Normal player trade routes expose a buy/sell/cost breakdown in the trade UI:
+A route buys a good in one market and sells it in another. Profit and the treasury's cut are both in the trade UI:
 
 ```text
-normal_trade_route_profit =
-    sell_value
-  - buy_cost
-  - merchant_maintenance
-  - sound_toll_fee_if_any
+route_profit =
+    sell_value                 # amount sold * sell price, after selling/import/export efficiency
+  - buy_cost                   # amount bought * buy price
+  - trade_route_maintenance
+  - sound_toll_if_any
 
-profit_per_merchant_capacity =
-    normal_trade_route_profit / merchant_capacity_used
-
-displayed_trade_income_from_route =
-    profit_per_merchant_capacity * trade_income
+profit_per_trade_capacity = route_profit / used_trade_capacity
+trade_income_to_treasury  = route_profit * trade_income_share
 ```
 
-For a possible route, the UI exposes the same shape before the route exists:
+`trade_income_share` is the fraction of profit that reaches the treasury; it tracks **Crown Power** (the rest goes to the estates by their estate power — see [National Crown Power](#national-crown-power)).
+
+*Worked example — Saffron, Konstantinoúpolis → Venexia:*
+
+| Leg | Value |
+|---|---:|
+| Sell 1.30 in Venexia @ 4.61 | `+6.55` |
+| Buy 1.30 in Konstantinoúpolis @ 4.42 | `−5.65` |
+| Trade route maintenance | `−0.32` |
+| Sound toll | `−0.05` |
+| **Total profit** | **`+0.52`** |
+| Trade income to treasury (`24%` share) | `0.52 × 0.24 =` **`+0.12`** |
+
+The route nets `+0.52`, but only the `24%` `trade_income` share — `+0.12` — reaches the treasury.
+
+**How much you can ship — capacity vs. distance.** Trade capacity converts to goods through a per-unit transport cost that jumps once a route passes your trade range:
 
 ```text
-possible_trade_profit =
-    possible_sell_price
-  - possible_buy_cost
-  - possible_maintenance
-  - possible_sound_toll_if_any
-
-possible_profit_per_merchant_capacity =
-    possible_trade_profit / desired_merchant_capacity
+amount_shippable        = trade_capacity / transport_cost_per_unit
+transport_cost_per_unit = good_base_transport * distance_multiplier
+distance_multiplier     = 1                          if route_cost <= trade_range
+                          (route_cost - trade_range) * distance_cost_factor   otherwise
 ```
 
-Evidence level: mixed. The GUI exposes `Trade.GetBuy`, `Trade.GetSell`, `Trade.GetMaintenance`, `Trade.GetSoundTollFee`, `Trade.GetProfit`, `Trade.GetProfitPerMerchantCapacity`, and `Trade.GetAssignedMerchantCapacityModifiedPlayer`; for possible routes it exposes `PossibleTrade.GetBuyCost`, `PossibleTrade.GetSellPrice`, `PossibleTrade.GetMaintenance`, `PossibleTrade.GetProfit`, and `PossibleTrade.GetDesiredMerchantCapacity`. The exact engine internals behind buy/sell/maintenance are not fully script-exposed.
+*In range:* `2.10` capacity ÷ `0.50` per unit of Incense = **`4.20`** shipped. *Out of range* (Varanasi → Venexia): the distance multiplier hits `×10.72`, so per-unit cost = `0.50 × 10.72 = 5.36` and `0.99` capacity ships only `≈ 0.18` Cloves. (Observed factor: `(8273 − 495) × ~0.0012`.)
 
-Burgher trade is not the same route object:
+**Market balance** sets the price pressure a route trades into:
 
 ```text
-burgher_trade_capacity =
-    burgher_population
-  * (local_trades_per_burgher + global_trades_per_burgher + other_burgher_trade_modifiers)
+market_balance = effective_supply - effective_demand
+   > 0  surplus -> price falls -> good to BUY
+   < 0  deficit -> price rises -> good to SELL
 ```
+
+A stockpile above `50%` capacity adds extra supply (growing until `75%`). Example: Jewelry in Venexia, supply `137.36` − demand `106.13` = **`+31.23`**, of which `+69.4` supply comes from a `1389`-unit stockpile.
+
+Evidence: route profit, profit-per-capacity, trade-income share, capacity→goods, distance cost, and market balance are all `Exact` from the UI (worked above); buy/sell price internals and the exact distance-cost factor are `Mixed`.
+
+**Burgher trade is a separate, autonomous system** — not a player route:
 
 ```text
-burgher_trade_wealth_gain ~= engine_result_of_burgher_trades_that_satisfy_market_needs
+burgher_trade_capacity = burgher_population * (local_trades_per_burgher + global_trades_per_burgher + ...)
 ```
 
-Evidence level: mixed/inferred. Installed localization says Burghers attempt to address goods needs in the market of their town or city by doing their own trades. Modifier text says `local_trades_per_burgher` and `global_trades_per_burgher` affect how much trade per population Burghers can do on their own. The exact wealth conversion is engine-side.
-
-Other pops create demand and work in buildings/RGOs, but they do not have an equivalent autonomous `trades_per_<pop>` capacity in the installed files. In this build, the named autonomous pop-trade system is Burgher-specific.
+Burghers trade on their own to satisfy goods needs in their town/city market, adding to location wealth (the exact conversion is engine-side). No other pop type has an autonomous `trades_per_<pop>` capacity in this build.
 
 ## Dependency Graph
 
@@ -1249,36 +1201,7 @@ Relative weights:
 | Maritime presence | Conditional/High | Mixed | Important for coastal control, merchant power, and sea-connected trade. |
 | Harbor capacity | Conditional | Exact/Mixed | Reduces sea-land transition cost in proximity and trade calculations. |
 
-Normal trade-route equations:
-
-```text
-trade_profit =
-    Trade.GetSell
-  - Trade.GetBuy
-  - Trade.GetMaintenance
-  - Trade.GetSoundTollFee
-
-trade_profit_per_capacity =
-    Trade.GetProfit / Trade.GetAssignedMerchantCapacityModifiedPlayer
-
-route_trade_income_display =
-    Trade.GetProfitPerMerchantCapacity * owner.trade_income
-```
-
-Possible-trade equations:
-
-```text
-possible_trade_profit =
-    PossibleTrade.GetSellPrice
-  - PossibleTrade.GetBuyCost
-  - PossibleTrade.GetMaintenance
-  - possible_sound_toll_if_any
-
-possible_profit_per_capacity =
-    PossibleTrade.GetProfit / PossibleTrade.GetDesiredMerchantCapacity
-```
-
-Use these as UI-level equations. The buy/sell values already include engine-side effects such as market prices, quantities, efficiencies, route conditions, and availability.
+The route-profit, capacity, distance, and trade-income equations — with worked examples — are in [Trade Profit And Income](#trade-profit-and-income). The UI exposes them as `Trade.GetSell/GetBuy/GetMaintenance/GetSoundTollFee/GetProfit` (and `PossibleTrade.*` for a route you are considering); those buy/sell values already fold in market prices, quantities, efficiencies, and route conditions.
 
 Normal trade and Burgher trade share the market, not the same control surface:
 
@@ -1401,75 +1324,48 @@ For broader parameter discovery, use `EU5_GAMEPLAY_PARAMETERS.md` as the project
 
 ## Strategy Checklist
 
-When choosing an economic action, walk the chain in order:
+Walk the treasury chain in order — fix the binding constraint before adding anything upstream of it:
 
-1. Is the location's wealth already high?
-2. Is control low enough that raising it gives immediate tax-base gain?
-3. Is market access suppressing profit or building caps?
-4. Is the wealth mostly RGO, building, or burgher trade?
-5. Are output prices high enough and input prices low enough for the branch to profit?
-6. Will new production create useful demand elsewhere or just oversupply the output good?
-7. Which estate will receive the tax base, and can that estate be taxed?
-8. Would trade capacity/range/power produce more immediate treasury income than local tax investment?
-9. Does storage protect the production chain from shortages?
-10. Does the action support future guide goals such as military logistics, control, diplomacy, or expansion?
+1. **Control first where wealth is high.** `tax_base = wealth × control`, so control is a direct multiplier; on rich, populous land it also raises Crown Power and removes the `inverse_control` penalty.
+2. **Identify the wealth source** (RGO / building / burgher trade) — the best lever differs per branch.
+3. **Check market access** — low access cuts building output, RGO profit, and even building caps.
+4. **Check the margin, not the output.** `profit = output − inputs − maintenance`; a high-output building with dear inputs adds little taxable wealth.
+5. **Find who holds the tax base.** It goes to estates by population × `tax_per_pop`, *not* by power — then check that estate's **max tax**, which falls as its estate power rises.
+6. **Watch Crown Power.** It is your share of trade/food income and it lifts every estate's max tax. Raise it via control of populous locations, Local Crown Power buildings there, and fewer estate privileges.
+7. **Compare trade vs. local tax.** Trade income ignores local control, so in low-control regions a route can beat local tax investment — but only the Crown-Power share reaches the treasury.
+8. **Protect the chain with storage** against input shortages and price spikes.
 
 ## Common Strategic Patterns
 
 ### Rich But Uncontrolled Land
 
-Best levers:
-
-- Raise max control with proximity, roads, ports, maritime presence, and control buildings.
-- Use monthly control modifiers to speed recovery.
-- Consider subjects in very low-control regions if local control would take too long and the subject can propagate its own control.
-
-Why: control is the direct tax-base multiplier. Raising control on rich land is often cleaner than adding more production to already untaxable wealth.
+- Raise max control (proximity, roads, ports, control buildings); use monthly-control modifiers to get there faster.
+- In very low-control regions, release a subject that propagates its own control, then annex later.
+- **Why:** control is the direct `tax_base` multiplier *and*, in your populous locations, a primary driver of Crown Power. Low-control conquest can actually *lower* Crown Power through the average-control path.
 
 ### Profitable Rural Raw Goods
 
-Best levers:
-
-- Expand RGO size where the good is valuable and demand is durable.
-- Improve market access before overbuilding.
-- Avoid urbanizing the best rural RGO locations unless the city plan is more valuable than lost RGO potential.
-- Use targeted output modifiers when the good is a strategic export or input.
-
-Why: RGO wealth can be high, but only if the location can employ workers and sell at a good effective price.
+- Expand RGO size only where the good is valuable, demand is durable, and the location can employ the pops.
+- Fix market access before overbuilding; avoid urbanizing your best rural RGOs (some urban ranks cut RGO potential).
+- **Why:** RGO wealth is real only at a good *effective* price (after market access), with workers to staff it.
 
 ### Industrial Towns And Cities
 
-Best levers:
-
-- Keep input and maintenance goods available and affordable.
-- Improve production efficiency, staffing, and promotion speed.
-- Build enough upstream production to prevent input bottlenecks.
-- Use market access and storage to avoid supply breaks.
-
-Why: buildings are the most scalable wealth branch, but their profit is sensitive to output prices, input costs, market access, and whether the location can actually staff them.
+- Keep input and maintenance goods cheap and available; build upstream supply to prevent bottlenecks.
+- Improve production efficiency, staffing, and promotion; use storage to ride out supply breaks.
+- **Why:** buildings are the most scalable wealth branch but margin-sensitive — `profit = output − inputs − maintenance`, at the mercy of prices, access, and labor.
 
 ### Trade-Focused Economy
 
-Best levers:
+- Grow trade capacity where profitable routes exist; raise Trade Advantage where supply is contested; extend trade range for long routes (past range, per-unit transport cost balloons — see [Trade Profit And Income](#trade-profit-and-income)).
+- **Keep Crown Power high:** `trade_income_to_treasury = route_profit × trade_income_share`, and that share tracks Crown Power; the rest leaks to the estates.
+- **Why:** trade income ignores local control, so it can beat local tax in low-control regions — but the estate split still gates how much you keep.
 
-- Increase merchant capacity where profitable routes exist.
-- Increase Trade Advantage where supply is contested.
-- Increase trade range for long-distance goods.
-- Maintain Crown Power and tax caps so commercial wealth reaches the treasury.
-- Use ports, harbor capacity, and maritime presence in coastal trade networks.
+### Low Crown Power / Estate-Dominated
 
-Why: trade has direct income and indirect price/availability effects. It can outperform local tax investment in low-control regions, but estate splits still matter.
-
-### Estate-Heavy Bottleneck
-
-Best levers:
-
-- Identify which estate owns the local tax base.
-- Check that estate's max tax cap and satisfaction/power effects.
-- Use laws, reforms, privileges, and societal values that improve extraction without breaking the productive branch.
-- Watch peasant enfranchisement because low values move peasant share toward Nobles, while high values let Peasants keep more of it.
-
-Why: tax base is not treasury income until it passes through estate allocation and tax extraction.
+- Raise Crown Power: control your most populous locations, place Local Crown Power buildings *there* (the gain is population-weighted), and revoke privileges from over-powerful estates when stability allows.
+- Watch peasant enfranchisement (low → share flows to Nobles) and each estate's max tax (it falls as that estate's power rises).
+- **Why:** Crown Power linearly sets your trade/food treasury share and lifts every estate's max-tax ceiling — both an income and an extraction multiplier.
 
 ## Planned Sections
 
