@@ -219,7 +219,7 @@ For quick estimates, treat `estate_power_modifier_e` as `1` unless the location/
 
 `final_estate_share_e` means the estate share after special transfer rules. The visible peasant value is `Location.GetPeasantEnfranchisment`; the underlying modifier keys use the installed spelling `local_peasant_enfranchisment` and `global_peasant_enfranchisment`.
 
-Installed per-pop weights (`estates/00_default.txt`). `tax_per_pop` weights the tax-base split; `power_per_pop` weights [estate power](#estate-power). The two are independent, so an estate can be rich but politically weak (Burghers) or poor but influential (Cossacks):
+Installed per-pop weights (`estates/00_default.txt`). `tax_per_pop` weights the tax-base split; `power_per_pop` weights [estate power](#estate-power). The two are independent, so an estate can be rich but politically weak (Burghers) or poor but influential (Cossacks). `power_per_pop` is counted **per 1,000 pops** (Nobles `25` = `0.025` political power per pop):
 
 | Estate | `tax_per_pop` | `power_per_pop` | Strategic meaning |
 |---|---:|---:|---|
@@ -953,7 +953,7 @@ Estate Power is an estate's **share of the country's total Political Power** —
 
 ```text
 estate_power_e =
-    ( SUM over locations [ SUM over pop types (pop_count * power_per_pop_e) ]
+    ( SUM over locations [ SUM over pop types (pop_count / 1000 * power_per_pop_e) ]   # power_per_pop is per 1,000 pops
       * (1 + local_modifier_e) )        # local_<estate>_estate_power, applied per location
     * (1 + national_modifier_e)         # global_<estate>_estate_power, crown_power_from_population, ...
 
@@ -967,7 +967,7 @@ Two consequences follow from the `SUM over locations`:
 - Estate power is **national, but built from locations.** Each location contributes `population × power_per_pop`, scaled by that location's `local_<estate>_estate_power`. So local estate-power modifiers (Local Crown Power included) **roll up into the national total**, weighted by how populous the location is — see [Local Crown Power From Buildings](#local-crown-power-from-buildings).
 - It is a **zero-sum share.** The in-game Estates hint calls it "a zero-sum distribution" between the estates and the Crown: raising one estate's power lowers everyone else's, and Crown Power is simply the Crown's slice of the same pie.
 
-`power_per_pop` is the dominant input, and it is **separate from the `tax_per_pop`** weight used for the wealth/tax-base split — an estate can be wealthy but politically weak (Burghers: tax 40, power 4) or poor but influential (Cossacks: tax 0.02, power 0.5). A single Nobles pop (`power_per_pop = 25`) wields about 1,000× the political power of a single Peasants pop (`0.025`). Characters add power on top — `0.25` for each one an estate has in the cabinet or commanding an army or navy (the constants below). See the [per-pop weights table](#estate-shares-and-tax-income) for all estates.
+`power_per_pop` is the dominant input, and it is **separate from the `tax_per_pop`** weight used for the wealth/tax-base split — an estate can be wealthy but politically weak (Burghers: tax 40, power 4) or poor but influential (Cossacks: tax 0.02, power 0.5). `power_per_pop` is counted **per 1,000 pops**, so a Nobles pop (`25` → `0.025` each) wields about 1,000× the political power of a Peasants pop (`0.025` → `0.000025` each). Characters an estate places in the cabinet or in army/navy command add power too — the worked example below shows two cabinet members at `+12.50%` each (underlying defines `BASE_ESTATE_POWER_FROM_CABINET` / `_FROM_COMMAND = 0.25`). See the [per-pop weights table](#estate-shares-and-tax-income) for all estates.
 
 Installed constants (`loading_screen/common/defines/00_defines.txt`):
 
@@ -989,15 +989,17 @@ Estate power is an *input* to several systems, not just a status bar:
 | Crown penalties | Too much total estate power — usually from over-granting privileges — starves Crown Power, and very low Crown Power triggers country-wide penalties. |
 | Estate satisfaction & culture | Primary/accepted culture and matching state religion raise an estate's power and satisfaction; heretic/heathen religion or foreign culture lower both. |
 
-**Worked example (in-game tooltip).** The Venetian Patriziato (a Nobles estate) shows the whole chain at once:
+**Worked example (in-game tooltips).** Two Venetian Nobles tooltips show the whole chain.
 
-- **Pop base:** `1,583 Nobles → 62.84` base Political Power (the per-pop weight after engine scaling — note it is not a raw `× 25`, so a scaling factor applies between pop count and base power).
-- **Modifiers:** that base is lifted by additive percentage modifiers from wealth, subjects, privileges, and laws — `Land Rights +75%`, `Fortification Licenses +75%`, `Feudal Mercenary Contracts +100%`, `Avogadoria de Comùn +50%`, `Elaborate Court Life +20%`, and more (the list continues below the visible area) — reaching **231.70** Political Power.
-- **Share:** `231.70 / 628.38 total = 36.87%` Estate Power — exactly the displayed value, so the normalization is a plain own-over-total ratio.
-- **Above the 0.25 threshold,** the Nobles `high_power` block fires, scaled by `(0.3687 − 0.25) = 0.1187`, and every line matches the tooltip to the decimal:
-  - `nobles_estate_max_tax = -1.0 × 0.1187 =` **−11.87%** maximum tax (the estate resists taxation)
-  - `levy_combat_efficiency_modifier = +1.0 × 0.1187 =` **+11.87%**
-  - `fort_maintenance_efficiency = +1.0 × 0.1187 =` **+11.87%**
+*Per-location base* (Nobles in Cioxa) states the per-pop rule outright — "Base Political Power of **134 Nobles** (`+25.00 for every 1,000 Pops`): **3.36**," i.e. `134 × 25/1000 = 3.36`. That base is then multiplied by a stack of additive percentage modifiers: estate-wide privileges (`Land Rights +75%`, `Fortification Licenses +75%`, `Feudal Mercenary Contracts +100%`, `Avogadoria de Comùn +50%`), location effects (`Noble Navy +33%`, `Plenty of Opportunities −13.53%`, `Council of Ten −10%`), and **each cabinet character the estate holds** (`Lazzaro Dandolo +12.50%`, `Nicolò Gradenigo +12.50%`).
+
+*National total* (the Patriziato) sums every location's contribution and reports the share: **231.70** of **628.38** total Political Power = **36.87%**, exactly the displayed Estate Power — so the share is a plain own-over-total ratio.
+
+*Threshold effects* use that **national** 36.87% share — the Cioxa tooltip itself labels them "Estate Power of the Patriziato is above 25.00%." Scaled by `(0.3687 − 0.25) = 0.1187`, every line matches to the decimal:
+
+- `nobles_estate_max_tax = -1.0 × 0.1187 =` **−11.87%** maximum tax (the estate resists taxation)
+- `levy_combat_efficiency_modifier = +1.0 × 0.1187 =` **+11.87%**
+- `fort_maintenance_efficiency = +1.0 × 0.1187 =` **+11.87%**
 
 Evidence level: per-pop weights and the cabinet/command/threshold constants are `Exact` from `estates/00_default.txt` and `00_defines.txt`. The share normalization (own ÷ total Political Power) and the high/low-power `(relative_power − 0.25)` scaling are `Exact`, confirmed to the decimal against the in-game Estate Power tooltip (worked example above). The summation-over-locations form matches the in-game Estates hint and the community wiki. Only the pop-count → base-power scaling factor and the exact ordering of the percentage modifiers remain engine-side (`Mixed`).
 
