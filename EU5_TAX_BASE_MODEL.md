@@ -1358,6 +1358,33 @@ Walk the treasury chain in order — fix the binding constraint before adding an
 
 ## Common Strategic Patterns
 
+### Choosing Where to Build
+
+Pick the location, not the prettiest number. The building list shows several quantities that diverge because each is a different link in one chain:
+
+```text
+production_efficiency -> building_profit (WEALTH) -> ×control -> tax_base -> ×extraction -> TAX
+  a multiplier            absolute; also depends      (e.g. the    (estate share ×
+  (output per worker)     on good value, prices,      90.73%       tax rate × caps ×
+                          market access, and size     haircut)     efficiency)
+```
+
+- **Efficiency %** is a multiplier, not a total — a small high-efficiency building can add less than a big low-efficiency one. Never choose by the `%`.
+- **Wealth** (`+0.89`/level in the [Gunsmith example](#building-wealth-subgraph)) is what the building makes; **tax** (`+0.35`/level) is what you keep, after **control** and **extraction** — which vary by location independently of efficiency. That is why a "less efficient" location can out-earn a more efficient one.
+
+**The metric:** for treasury, rank locations by **tax added per construction cost** (the list's *tax* column ÷ cost), not by efficiency or raw wealth. But optimize **net** system profit, not one building's gross: a build can look profitable yet lose money by importing the food its new town stopped growing (the "city trap"), stealing labor from other buildings, or crashing its own output price.
+
+**Control is the master multiplier** — `tax = wealth × control × extraction` — so the same building earns far more where control is high. Build control infrastructure (roads out from the capital, forts) *first*; it lifts every tax in the area at once.
+
+**Untaxed wealth still works for you.** What you don't tax goes to the estates, who reinvest it in their own buildings, gain satisfaction, and create demand that lifts upstream prices you *can* tax — so the weighting bends by location:
+
+| Where | Optimize for | Why |
+|---|---|---|
+| **Secure core** (high control, staying yours) | raw **wealth** nearly as much as tax | estate reinvestment and demand compound it, and it becomes tax base once control/extraction rise |
+| **Frontier / low control** | only **tax** (or **trade**, which ignores control) | wealth here mostly enriches estates you barely tax |
+
+**Decision order:** (1) is control high or roadable? → (2) does it keep the province food/labor-balanced (avoid the city trap)? → (3) valuable good, cheap inputs, workers present? → (4) rank survivors by tax-per-cost, weighting wealth up in the core, down on the fringe → (5) value the upstream input demand it creates (keep shared industrial goods cheap). Cross-checked against the EU5 community wiki and strategy guides; the equations are in [Building Wealth](#building-wealth-subgraph) and [Where the Money Goes](#where-the-money-goes).
+
 ### Rich But Uncontrolled Land
 
 - Raise max control (proximity, roads, ports, control buildings); use monthly-control modifiers to get there faster.
